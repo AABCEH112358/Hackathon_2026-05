@@ -7,4 +7,5 @@ __pycache__/
 uv.lock
 ml/checkpoints/*.pt
 ml/checkpoints/*.pkl
+ml/checkpoints/*.json
 !ml/checkpoints/.gitkeep
