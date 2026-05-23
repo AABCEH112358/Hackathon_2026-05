@@ -3,7 +3,9 @@ import "./style.css";
 
 const ASSETS = {
   aerial: "/assets/aerialm.webp",
-  city: "/assets/map1.jpg",
+  pythonCity: "/assets/map1.jpg",
+  javascriptCity: "/assets/map2.webp",
+  cCity: "/assets/map3.png",
 };
 
 const WATER_BLUE = "#202da6";
@@ -26,16 +28,16 @@ const topicPins = [
     color: 0xfbbf24,
     xPercent: 0.72,
     yPercent: 0.34,
-    available: false,
+    available: true,
   },
   {
     id: "c",
     label: "C District",
     topic: "c",
-    color: 0x8b5cf6,
+    color: 0x22c55e,
     xPercent: 0.28,
     yPercent: 0.76,
-    available: false,
+    available: true,
   },
 ];
 
@@ -87,6 +89,102 @@ const pythonRepos = [
   },
 ];
 
+const javascriptRepos = [
+  {
+    id: "js-1",
+    name: "React Component Lab",
+    fileName: "App.jsx",
+    repoUrl: "https://github.com/example/react-component-lab",
+    description: "A React project with reusable UI components and page layouts.",
+    xPercent: 0.42,
+    yPercent: 0.39,
+  },
+  {
+    id: "js-2",
+    name: "Node API Gateway",
+    fileName: "server.js",
+    repoUrl: "https://github.com/example/node-api-gateway",
+    description: "A Node.js backend that handles routes, middleware, and API requests.",
+    xPercent: 0.58,
+    yPercent: 0.46,
+  },
+  {
+    id: "js-3",
+    name: "Vite Starter Kit",
+    fileName: "main.js",
+    repoUrl: "https://github.com/example/vite-starter-kit",
+    description: "A fast Vite app setup with JavaScript modules and frontend tooling.",
+    xPercent: 0.71,
+    yPercent: 0.53,
+  },
+  {
+    id: "js-4",
+    name: "Canvas Animation Engine",
+    fileName: "animation.js",
+    repoUrl: "https://github.com/example/canvas-animation-engine",
+    description: "A browser animation project using canvas rendering and game loops.",
+    xPercent: 0.36,
+    yPercent: 0.63,
+  },
+  {
+    id: "js-5",
+    name: "Dashboard Widgets",
+    fileName: "dashboard.js",
+    repoUrl: "https://github.com/example/dashboard-widgets",
+    description: "Interactive JavaScript dashboard widgets for visualizing project data.",
+    xPercent: 0.61,
+    yPercent: 0.69,
+  },
+];
+
+const cRepos = [
+  {
+    id: "c-1",
+    name: "Embedded Sensor Core",
+    fileName: "sensor.c",
+    repoUrl: "https://github.com/example/embedded-sensor-core",
+    description: "C code for reading sensor values and processing embedded data.",
+    xPercent: 0.38,
+    yPercent: 0.42,
+  },
+  {
+    id: "c-2",
+    name: "Memory Manager",
+    fileName: "memory.c",
+    repoUrl: "https://github.com/example/memory-manager",
+    description: "A low-level C project focused on pointers, allocation, and memory safety.",
+    xPercent: 0.55,
+    yPercent: 0.36,
+  },
+  {
+    id: "c-3",
+    name: "Microcontroller Driver Kit",
+    fileName: "driver.c",
+    repoUrl: "https://github.com/example/microcontroller-driver-kit",
+    description: "Device driver code for configuring registers and controlling hardware pins.",
+    xPercent: 0.68,
+    yPercent: 0.51,
+  },
+  {
+    id: "c-4",
+    name: "Terminal Game Engine",
+    fileName: "game.c",
+    repoUrl: "https://github.com/example/terminal-game-engine",
+    description: "A C terminal game project with loops, input handling, and game state logic.",
+    xPercent: 0.44,
+    yPercent: 0.66,
+  },
+  {
+    id: "c-5",
+    name: "Systems Utilities",
+    fileName: "utils.c",
+    repoUrl: "https://github.com/example/systems-utilities",
+    description: "Utility functions for file handling, strings, and command-line tools.",
+    xPercent: 0.62,
+    yPercent: 0.72,
+  },
+];
+
 class GitHubAtlasScene extends Phaser.Scene {
   constructor() {
     super("GitHubAtlasScene");
@@ -110,11 +208,16 @@ class GitHubAtlasScene extends Phaser.Scene {
 
   preload() {
     this.load.image("aerialMap", ASSETS.aerial);
-    this.load.image("cityMap", ASSETS.city);
+    this.load.image("pythonCityMap", ASSETS.pythonCity);
+    this.load.image("javascriptCityMap", ASSETS.javascriptCity);
+    this.load.image("cCityMap", ASSETS.cCity);
   }
 
   create() {
     this.cameras.main.setBackgroundColor(WATER_BLUE);
+
+    this.injectDashboardMinimizeStyles();
+    this.createDashboardMinimizeButton();
 
     this.createMap("aerialMap");
     this.createControls();
@@ -164,6 +267,8 @@ class GitHubAtlasScene extends Phaser.Scene {
   }
 
   fitMapToScreen() {
+    if (!this.mapImage || !this.mapLayer) return;
+
     const screenWidth = this.scale.width;
     const screenHeight = this.scale.height;
 
@@ -171,6 +276,12 @@ class GitHubAtlasScene extends Phaser.Scene {
     const scaleY = screenHeight / this.mapImage.height;
 
     this.baseScale = Math.max(scaleX, scaleY);
+
+    this.currentZoom = 1;
+    this.tiltY = 1;
+
+    this.mapLayer.setPosition(screenWidth / 2, screenHeight / 2);
+    this.mapLayer.setRotation(0);
 
     this.applyMapScale();
   }
@@ -212,6 +323,7 @@ class GitHubAtlasScene extends Phaser.Scene {
 
     this.input.on("pointermove", (pointer) => {
       if (!pointer.isDown || !this.mapLayer) return;
+      if (this.mode !== "aerial") return;
 
       this.mapLayer.x += pointer.velocity.x / 10;
       this.mapLayer.y += pointer.velocity.y / 10;
@@ -219,6 +331,7 @@ class GitHubAtlasScene extends Phaser.Scene {
 
     this.input.on("wheel", (pointer, gameObjects, deltaX, deltaY) => {
       if (!this.mapLayer) return;
+      if (this.mode !== "aerial") return;
 
       if (deltaY > 0) {
         this.currentZoom -= 0.08;
@@ -234,6 +347,7 @@ class GitHubAtlasScene extends Phaser.Scene {
 
   update() {
     if (!this.keys || !this.mapLayer) return;
+    if (this.mode !== "aerial") return;
 
     if (this.keys.q.isDown || this.keys.left.isDown) {
       this.mapLayer.rotation -= this.rotationSpeed;
@@ -321,7 +435,7 @@ class GitHubAtlasScene extends Phaser.Scene {
           A district pin has appeared on the aerial map.
           ${
             topicPin.available
-              ? "Python is currently connected to the city demo."
+              ? "Click the glowing map pin to enter this district."
               : "This district is hardcoded for now, but the city view is coming later."
           }
         </p>
@@ -346,9 +460,13 @@ class GitHubAtlasScene extends Phaser.Scene {
       onClick: () => {
         if (topicPin.id === "python") {
           this.enterPythonCity();
+        } else if (topicPin.id === "javascript") {
+          this.enterJavaScriptCity();
+        } else if (topicPin.id === "c") {
+          this.enterCCity();
         } else {
           this.updateStatus(
-            `<strong>${topicPin.label}</strong> was clicked. Only Python is connected to the city view right now.`
+            `<strong>${topicPin.label}</strong> was clicked. This district is not connected to a city view right now.`
           );
         }
       },
@@ -370,19 +488,20 @@ class GitHubAtlasScene extends Phaser.Scene {
   enterPythonCity() {
     this.mode = "city";
 
-    this.createMap("cityMap");
+    this.createMap("pythonCityMap");
+    this.lockCityMapToFullScreen();
     this.showBackButton(true);
 
     this.updateStatus(
-      "Entered <strong>Python City</strong>. Click one of the repo file pins to fly into that building and generate a Mission Brief.md file."
+      "Entered <strong>Python City</strong>. Click one of the repo file pins to generate a Mission Brief.md file."
     );
 
     this.setResultBox(`
       <div class="result-card">
         <h3>Python City</h3>
         <p>
-          5 placeholder Python repo files are now pinned on the city view.
-          Click any glowing repo pin to trigger the fly-in effect.
+          5 placeholder Python repo files are pinned on the city view.
+          Click any glowing repo pin to generate a Mission Brief.
         </p>
       </div>
     `);
@@ -392,28 +511,99 @@ class GitHubAtlasScene extends Phaser.Scene {
     });
   }
 
+  enterJavaScriptCity() {
+    this.mode = "city";
+
+    this.createMap("javascriptCityMap");
+    this.lockCityMapToFullScreen();
+    this.showBackButton(true);
+
+    this.updateStatus(
+      "Entered <strong>JavaScript District</strong>. Click one of the repo file pins to generate a Mission Brief.md file."
+    );
+
+    this.setResultBox(`
+      <div class="result-card">
+        <h3>JavaScript District</h3>
+        <p>
+          5 placeholder JavaScript repo files are pinned on the city view.
+          Click any glowing repo pin to generate a Mission Brief.
+        </p>
+      </div>
+    `);
+
+    javascriptRepos.forEach((repo) => {
+      this.createJavaScriptRepoPin(repo);
+    });
+  }
+
+  enterCCity() {
+    this.mode = "city";
+
+    this.createMap("cCityMap");
+    this.lockCityMapToFullScreen();
+    this.showBackButton(true);
+
+    this.updateStatus(
+      "Entered <strong>C District</strong>. Click one of the repo file pins to generate a Mission Brief.md file."
+    );
+
+    this.setResultBox(`
+      <div class="result-card">
+        <h3>C District</h3>
+        <p>
+          5 placeholder C repo files are pinned on the city view.
+          Click any glowing repo pin to generate a Mission Brief.
+        </p>
+      </div>
+    `);
+
+    cRepos.forEach((repo) => {
+      this.createCRepoPin(repo);
+    });
+  }
+
+  lockCityMapToFullScreen() {
+    if (!this.mapLayer || !this.mapImage) return;
+
+    const screenWidth = this.scale.width;
+    const screenHeight = this.scale.height;
+
+    const scaleX = screenWidth / this.mapImage.width;
+    const scaleY = screenHeight / this.mapImage.height;
+
+    this.baseScale = Math.max(scaleX, scaleY);
+    this.currentZoom = 1;
+    this.tiltY = 1;
+
+    this.mapLayer.setPosition(screenWidth / 2, screenHeight / 2);
+    this.mapLayer.setRotation(0);
+    this.mapLayer.setScale(this.baseScale, this.baseScale);
+  }
+
   createPythonRepoPin(repo) {
+    this.createRepoPin(repo, 0x6366f1);
+  }
+
+  createJavaScriptRepoPin(repo) {
+    this.createRepoPin(repo, 0xfbbf24);
+  }
+
+  createCRepoPin(repo) {
+    this.createRepoPin(repo, 0x22c55e);
+  }
+
+  createRepoPin(repo, color) {
     const { localX, localY } = this.percentToLocal(repo.xPercent, repo.yPercent);
 
     const group = this.createMapPin({
       localX,
       localY,
-      color: 0x6366f1,
+      color,
       label: repo.fileName,
       size: 15,
       onClick: () => {
-        this.flyToPoint({
-          localX,
-          localY,
-          targetZoom: 2.8,
-          targetTiltY: 1,
-          targetRotation: 0,
-          duration: 1200,
-          labelText: `Opening ${repo.fileName}`,
-          onComplete: () => {
-            this.generateMissionBrief(repo);
-          },
-        });
+        this.generateMissionBrief(repo);
       },
     });
 
@@ -520,6 +710,13 @@ class GitHubAtlasScene extends Phaser.Scene {
     labelText = "",
     onComplete,
   }) {
+    if (this.mode !== "aerial") {
+      if (onComplete) {
+        onComplete();
+      }
+      return;
+    }
+
     const screenCenterX = this.scale.width / 2;
     const screenCenterY = this.scale.height / 2;
 
@@ -590,9 +787,9 @@ This placeholder mission brief explains the purpose of the repo, the important f
 
 ## How to Run
 1. Clone the repository.
-2. Create a virtual environment.
-3. Install dependencies.
-4. Run the main Python file.
+2. Install dependencies.
+3. Run the development server.
+4. Open the main file and trace how data moves through the project.
 
 ## Suggested Contribution Ideas
 - Improve documentation.
@@ -729,6 +926,75 @@ Open ${repo.fileName}, read through the main functions, and add a short explanat
       backButton.classList.add("hidden");
     }
   }
+
+  injectDashboardMinimizeStyles() {
+    const existingStyle = document.getElementById("dashboard-minimize-styles");
+
+    if (existingStyle) return;
+
+    const style = document.createElement("style");
+    style.id = "dashboard-minimize-styles";
+    style.innerHTML = `
+      .dashboard-minimize-button {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 9999;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.88);
+        color: white;
+        font-weight: 800;
+        font-size: 14px;
+        padding: 10px 14px;
+        cursor: pointer;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      .dashboard-minimize-button:hover {
+        background: rgba(30, 41, 59, 0.95);
+      }
+
+      body.dashboard-collapsed .dashboard,
+      body.dashboard-collapsed .panel,
+      body.dashboard-collapsed .sidebar,
+      body.dashboard-collapsed .control-panel,
+      body.dashboard-collapsed .dashboard-panel,
+      body.dashboard-collapsed #dashboard,
+      body.dashboard-collapsed #sidePanel {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(110%);
+        transition: 180ms ease;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  createDashboardMinimizeButton() {
+    const existingButton = document.getElementById("dashboardMinimizeButton");
+
+    if (existingButton) return;
+
+    const button = document.createElement("button");
+    button.id = "dashboardMinimizeButton";
+    button.className = "dashboard-minimize-button";
+    button.textContent = "Hide Dashboard";
+
+    button.addEventListener("click", () => {
+      document.body.classList.toggle("dashboard-collapsed");
+
+      if (document.body.classList.contains("dashboard-collapsed")) {
+        button.textContent = "Show Dashboard";
+      } else {
+        button.textContent = "Hide Dashboard";
+      }
+    });
+
+    document.body.appendChild(button);
+  }
 }
 
 const config = {
@@ -737,8 +1003,6 @@ const config = {
   width: window.innerWidth,
   height: window.innerHeight,
 
-  // This controls the Phaser canvas background.
-  // It replaces the black empty space with ocean blue.
   backgroundColor: WATER_BLUE,
 
   scale: {
