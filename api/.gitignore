@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+uv.lock
+ml/checkpoints/*.pt
+ml/checkpoints/*.pkl
+!ml/checkpoints/.gitkeep
