@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>GitHub Atlas</title>
+  </head>
+
+  <body>
+    <div id="app"></div>
+
+    <aside id="dashboard">
+      <div class="dashboard-header">
+        <p class="eyebrow">GitHub Atlas</p>
+        <h1>Repo Map</h1>
+        <p class="subtitle">
+          Search a coding topic to reveal its district on the aerial map.
+        </p>
+      </div>
+
+      <div class="search-box">
+        <input id="topicInput" placeholder="Search python, javascript, or C" />
+        <button id="searchButton">Search</button>
+      </div>
+
+      <div class="quick-buttons">
+        <button data-topic="python">Python</button>
+        <button data-topic="javascript">JavaScript</button>
+        <button data-topic="c">C</button>
+      </div>
+
+      <div id="statusBox" class="status-box">
+        Search <strong>python</strong> to reveal the first working district.
+      </div>
+
+      <div id="resultBox" class="result-box"></div>
+
+      <button id="backButton" class="back-button hidden">
+        ← Back to Aerial Map
+      </button>
+
+      <div class="controls-card">
+        <h2>Controls</h2>
+        <p><strong>Drag:</strong> move map</p>
+        <p><strong>Scroll:</strong> zoom</p>
+        <p><strong>Q / E:</strong> rotate</p>
+        <p><strong>W / S:</strong> 2.5D tilt</p>
+        <p><strong>R:</strong> reset view</p>
+      </div>
+    </aside>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
