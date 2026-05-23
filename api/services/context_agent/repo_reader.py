@@ -33,6 +33,21 @@ SOURCE_PATTERNS: tuple[str, ...] = (
     "main.rs",
 )
 
+# Important file names to pick when drilling into package subdirs
+IMPORTANT_FILENAMES = (
+    "__init__.py",
+    "api.py",
+    "main.py",
+    "core.py",
+    "models.py",
+    "client.py",
+    "server.py",
+    "app.py",
+    "router.py",
+    "index.ts",
+    "index.js",
+)
+
 MAX_SOURCE_FILES = 10
 README_MAX_CHARS = 5000
 SOURCE_FILE_MAX_CHARS = 2000
@@ -177,53 +192,58 @@ def _blob_paths_matching_heuristics(tree_items: list[dict[str, Any]]) -> list[st
     ]
 
 
+async def _list_contents(
+    client: httpx.AsyncClient, owner: str, repo: str, path: str = ""
+) -> list[dict[str, Any]]:
+    """List contents of a directory using the contents API (more reliable than git/trees)."""
+    url = f"{GITHUB_API}/repos/{owner}/{repo}/contents/{path}"
+    data = await _get_json(client, url, not_found_ok=True)
+    if not data or not isinstance(data, list):
+        return []
+    return data
+
+
 async def _collect_source_paths(
     client: httpx.AsyncClient, owner: str, repo: str
 ) -> list[str]:
-    # GitHub treats any `recursive` query value as true; `recursive=0` still
-    # returns a full tree on many repos. When the response is shallow, drill
-    # one level into `src/` and `lib/`.
-    root = await _get_json(
-        client,
-        f"{GITHUB_API}/repos/{owner}/{repo}/git/trees/HEAD",
-        params={"recursive": "0"},
-    )
-    assert root is not None
+    # Use contents API — more reliable than git/trees/HEAD across repos
+    root_items = await _list_contents(client, owner, repo)
+    candidates: list[str] = []
 
-    tree_items = list(root.get("tree", []))
-    candidates = _blob_paths_matching_heuristics(tree_items)
+    # Match root-level files against heuristics
+    for item in root_items:
+        if item.get("type") == "file" and _matches_source_heuristic(item.get("name", "")):
+            candidates.append(item["name"])
 
-    # Full recursive trees already include nested paths; only drill when shallow.
-    tree_is_flat_recursive = any("/" in item.get("path", "") for item in tree_items)
-
-    if not tree_is_flat_recursive and len(candidates) < MAX_SOURCE_FILES:
-        for item in tree_items:
-            path = item.get("path", "")
-            if item.get("type") != "tree" or path not in ("src", "lib"):
-                continue
-            subtree = await _list_tree_items(client, owner, repo, item["sha"])
-            for child_path in _blob_paths_matching_heuristics(
-                [
-                    {
-                        "type": "blob",
-                        "path": f"{path}/{child['path']}",
-                    }
-                    for child in subtree
-                    if child.get("type") == "blob"
-                ]
-            ):
-                candidates.append(child_path)
+    # Drill into src/ and lib/
+    for item in root_items:
+        if item.get("type") != "dir" or item.get("name") not in ("src", "lib"):
+            continue
+        sub_items = await _list_contents(client, owner, repo, item["name"])
+        for sub in sub_items:
+            sub_path = f"{item['name']}/{sub['name']}"
+            if sub.get("type") == "file" and _matches_source_heuristic(sub_path):
+                candidates.append(sub_path)
+            elif sub.get("type") == "dir":
+                # Go one level deeper (e.g. src/requests/*.py)
+                deep_items = await _list_contents(client, owner, repo, sub_path)
+                for deep in deep_items:
+                    if deep.get("type") == "file" and deep.get("name") in IMPORTANT_FILENAMES:
+                        candidates.append(f"{sub_path}/{deep['name']}")
 
     seen: set[str] = set()
     unique: list[str] = []
-    for path in sorted(candidates, key=_pattern_priority):
+    for path in sorted(candidates, key=lambda p: (
+        # prefer shallower paths and important filenames
+        p.count("/"),
+        next((i for i, f in enumerate(IMPORTANT_FILENAMES) if p.endswith(f)), 99),
+        p,
+    )):
         if path not in seen:
             seen.add(path)
             unique.append(path)
 
-    if len(unique) > MAX_SOURCE_FILES:
-        return unique[:MAX_SOURCE_FILES]
-    return unique
+    return unique[:MAX_SOURCE_FILES]
 
 
 async def _fetch_file_content(

@@ -12,8 +12,14 @@ from config import get_settings
 MODEL_FAST = "gpt-4o-mini"
 MODEL_QUALITY = "gpt-4o"
 
-_settings = get_settings()
-_client = AsyncOpenAI(api_key=_settings.openai_api_key)
+_client: AsyncOpenAI | None = None
+
+
+def _get_client() -> AsyncOpenAI:
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(api_key=get_settings().openai_api_key)
+    return _client
 
 
 def _should_retry(exc: BaseException) -> bool:
@@ -37,7 +43,7 @@ async def chat_completion(
     user_message: str,
     max_tokens: int,
 ) -> str:
-    response = await _client.chat.completions.create(
+    response = await _get_client().chat.completions.create(
         model=model,
         max_tokens=max_tokens,
         messages=[
