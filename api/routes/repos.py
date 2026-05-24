@@ -7,7 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Repo
 from db.session import get_db
-from schemas import LayoutRepoItem, LayoutResponse, SeedRequest, SeedResponse
+from schemas import (
+    LayoutRepoItem,
+    LayoutResponse,
+    RepoDetailResponse,
+    SeedRequest,
+    SeedResponse,
+)
 from services.github_ingestion import GitHubIngestionService
 from services.layout import LayoutService
 
@@ -68,3 +74,41 @@ async def get_layout(db: AsyncSession = Depends(get_db)) -> LayoutResponse:
 
     logger.info("repos.layout_served", count=len(items))
     return LayoutResponse(repos=items)
+
+
+@router.get("/{repo_id:path}", response_model=RepoDetailResponse)
+async def get_repo(repo_id: str, db: AsyncSession = Depends(get_db)) -> RepoDetailResponse:
+    """Return full repo metadata plus the 3 most similar repos by embedding."""
+    result = await db.execute(select(Repo).where(Repo.id == repo_id))
+    repo = result.scalar_one_or_none()
+    if repo is None:
+        raise HTTPException(status_code=404, detail="repo_not_found")
+
+    similar_repo_ids: list[str] = []
+    if repo.embedding is not None:
+        similar_result = await db.execute(
+            select(Repo.id)
+            .where(Repo.id != repo_id, Repo.embedding.is_not(None))
+            .order_by(Repo.embedding.cosine_distance(repo.embedding))
+            .limit(3)
+        )
+        similar_repo_ids = list(similar_result.scalars().all())
+
+    logger.info("repos.detail_served", repo_id=repo_id, similar_count=len(similar_repo_ids))
+    return RepoDetailResponse(
+        id=repo.id,
+        github_id=repo.github_id,
+        owner=repo.owner,
+        name=repo.name,
+        description=repo.description or "",
+        stars=repo.stars,
+        forks=repo.forks,
+        language=repo.language or "",
+        topics=[str(topic) for topic in (repo.topics or [])],
+        last_commit_at=repo.last_commit_at,
+        tile_x=repo.tile_x,
+        tile_y=repo.tile_y,
+        height=repo.height,
+        trending_score=repo.trending_score,
+        similar_repo_ids=similar_repo_ids,
+    )
