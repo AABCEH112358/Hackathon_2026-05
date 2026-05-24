@@ -1,5 +1,5 @@
 # Kristen — Platform UI/UX (the shell around the map)
-## GitHub Atlas Hackathon
+## Repo Pilot Hackathon
 
 You own the chrome around the map: search, side panel, the "Generate Context.md" button and viewer, the welcome screen. Plus you're the one who creates the GitHub repo and the Next.js project everyone else mounts into.
 
@@ -21,9 +21,9 @@ You've used React but not deeply — this prompt is calibrated for that. We're u
 
 ## Hour 1 first steps (YOU GO FIRST — others wait for your repo)
 
-1. Create a GitHub repo: `github-atlas` (public, MIT license)
+1. Create a GitHub repo: `repo-pilot` (public, MIT license)
 2. Add Anes, David, Abiya as collaborators in repo settings
-3. Clone it locally, `cd github-atlas`
+3. Clone it locally, `cd repo-pilot`
 4. `mkdir web && cd web`
 5. `npx create-next-app@latest . --typescript --tailwind --app --no-eslint`
 6. `npx shadcn@latest init` (accept defaults, slate theme, "Default" style)
@@ -38,7 +38,7 @@ You've used React but not deeply — this prompt is calibrated for that. We're u
 ## THE CURSOR PROMPT (copy everything below into Cursor's agent)
 
 ```
-I'm building the UI shell for "GitHub Atlas" — a SimCity-style isometric
+I'm building the UI shell for "Repo Pilot" — a SimCity-style isometric
 map of GitHub repos. The map itself (Phaser canvas) is being built by a
 teammate and will mount inside my page. My job is everything around the
 map: search bar, side panel for repo detail, the "Generate Context.md"

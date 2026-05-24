@@ -1,4 +1,4 @@
-# GitHub Atlas API
+# Repo Pilot API
 
 Backend for the isometric GitHub repo map.
 
