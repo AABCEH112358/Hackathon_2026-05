@@ -1,7 +1,7 @@
 [project]
-name = "github-atlas-api"
+name = "repo-pilot-api"
 version = "0.1.0"
-description = "GitHub Atlas backend — ingestion, layout, ML scoring"
+description = "Repo Pilot backend — ingestion, layout, ML scoring"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

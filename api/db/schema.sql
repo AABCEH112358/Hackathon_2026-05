@@ -1,4 +1,4 @@
--- GitHub Atlas initial schema (Neon Postgres + pgvector)
+-- Repo Pilot initial schema (Neon Postgres + pgvector)
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS repos (
