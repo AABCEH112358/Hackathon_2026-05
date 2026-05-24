@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepoPilot</title>
+
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+  <div id="app">
+    <div id="mapLayer" class="map-layer aerial-view"></div>
+    <div id="pinsLayer" class="pins-layer"></div>
+
+    <aside id="dashboard">
+      <button
+        id="minimizeDashboardButton"
+        class="minimize-dashboard-button"
+        type="button"
+        aria-label="Minimize dashboard"
+      >
+        −
+      </button>
+
+      <div class="dashboard-header">
+        <p class="eyebrow">RepoPilot</p>
+        <h1 id="dashboardTitle">Random Entry Points</h1>
+        <p id="statusText">Loading repo layout from API...</p>
+      </div>
+
+      <div id="searchControls" class="search-row">
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Search repo, owner, language..."
+        />
+        <button id="searchButton" type="button">Search</button>
+      </div>
+
+      <div id="randomControls" class="button-row">
+        <button id="randomButton" type="button">Randomize 3</button>
+        <button id="resetButton" type="button">Reset</button>
+      </div>
+
+      <button id="backButton" class="hidden" type="button">
+        ← Back to aerial view
+      </button>
+
+      <section id="repoListSection">
+        <h2>Selected entry points</h2>
+        <div id="repoList" class="repo-list"></div>
+      </section>
+
+      <section id="repoDetails" class="repo-details hidden">
+        <h2 id="selectedRepoName">Repo Name</h2>
+        <p id="selectedRepoMeta"></p>
+
+        <div class="stats-grid">
+          <div>
+            <span>Height</span>
+            <strong id="selectedRepoHeight">-</strong>
+          </div>
+
+          <div>
+            <span>Stars</span>
+            <strong id="selectedRepoStars">-</strong>
+          </div>
+
+          <div>
+            <span>Forks</span>
+            <strong id="selectedRepoForks">-</strong>
+          </div>
+
+          <div>
+            <span>Trend</span>
+            <strong id="selectedRepoTrend">-</strong>
+          </div>
+        </div>
+
+        <p class="hint">
+          Click a file pin in the city view to generate a markdown preview.
+        </p>
+      </section>
+
+      <section id="markdownPanel" class="markdown-panel hidden">
+        <div class="markdown-header">
+          <h2 id="markdownTitle">Generated file</h2>
+          <button id="downloadMarkdownButton" type="button">
+            Download .md
+          </button>
+        </div>
+
+        <pre id="markdownOutput"></pre>
+      </section>
+    </aside>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
