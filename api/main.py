@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from db.session import init_db, test_connection
+from routes import context as context_route
 from routes import repos
 from routes.interactions import router as interactions_router
 from routes.personalize import router as personalize_router
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(repos.router, prefix="/api/repos", tags=["repos"])
+    app.include_router(context_route.router, prefix="/api/context", tags=["context"])
     app.include_router(trending_router, prefix="/api/trending")
     app.include_router(interactions_router, prefix="/api/interactions")
     app.include_router(personalize_router, prefix="/api/personalize")
