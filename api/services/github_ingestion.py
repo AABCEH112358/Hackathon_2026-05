@@ -12,8 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from config import get_settings
 from db.models import Repo, StarHistory
-from services.embeddings import EmbeddingService
-from services.repo_filter import is_repo_blocked, get_embedding_service
+from services.embeddings import EmbeddingService, get_embedding_service
 
 logger = structlog.get_logger(__name__)
 
@@ -111,20 +110,6 @@ class GitHubIngestionService:
                     if len(collected) >= target:
                         break
                 logger.info("github.page_fetched", page=page, total=len(collected))
-
-        if not collected:
-            return 0
-
-        collected = [
-            r
-            for r in collected
-            if not is_repo_blocked(
-                owner=r.get("owner"),
-                name=r.get("name"),
-                repo_id=r.get("id"),
-                description=r.get("description"),
-            )
-        ]
 
         if not collected:
             return 0
