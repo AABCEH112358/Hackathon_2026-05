@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from db.session import init_db, test_connection
+from routes import context as context_route
 from routes import repos
 
 import logging
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(repos.router, prefix="/api/repos", tags=["repos"])
+    app.include_router(context_route.router, prefix="/api/context", tags=["context"])
     return app
 
 
