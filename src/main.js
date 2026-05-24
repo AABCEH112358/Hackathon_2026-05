@@ -11,6 +11,7 @@ import {
   findDistrictForRepo,
   REPOS_PER_DISTRICT,
 } from "./districts.js";
+import { filterBlockedRepos } from "./repoFilter.js";
 
 const mapLayer = document.getElementById("mapLayer");
 const pinsLayer = document.getElementById("pinsLayer");
@@ -75,7 +76,7 @@ let currentAerialTitle = "World Map";
 let pendingSearchRepo = null;
 
 const USER_ID_KEY = "repo_map_user_id";
-const REPO_CACHE_KEY = "repopilot_repo_layout_cache_v1";
+const REPO_CACHE_KEY = "repopilot_repo_layout_cache_v2";
 
 const cityRepoPositions = [
   { x: 22, y: 38 },
@@ -268,7 +269,7 @@ async function loadRepoLayout() {
   const cachedRepos = loadCachedRepos();
 
   if (cachedRepos.length) {
-    allRepos = cachedRepos;
+    allRepos = filterBlockedRepos(cachedRepos);
     districts = buildDistricts(allRepos);
     renderAerialWorld();
     setStatus(`Loaded ${allRepos.length} repos from cache. Refreshing in background...`);
@@ -282,7 +283,7 @@ async function loadRepoLayout() {
       throw new Error("API returned no repos.");
     }
 
-    allRepos = layoutRepos;
+    allRepos = filterBlockedRepos(layoutRepos);
     saveCachedRepos(allRepos);
 
     districts = buildDistricts(allRepos);

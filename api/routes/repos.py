@@ -16,6 +16,7 @@ from schemas import (
 )
 from services.github_ingestion import GitHubIngestionService
 from services.layout import LayoutService
+from services.repo_filter import is_repo_blocked
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -57,6 +58,8 @@ async def get_layout(db: AsyncSession = Depends(get_db)) -> LayoutResponse:
     for repo in repos:
         if repo.tile_x is None or repo.tile_y is None:
             continue
+        if is_repo_blocked(owner=repo.owner, name=repo.name, repo_id=repo.id, description=repo.description):
+            continue
         items.append(
             LayoutRepoItem(
                 id=repo.id,
@@ -81,7 +84,9 @@ async def get_repo(repo_id: str, db: AsyncSession = Depends(get_db)) -> RepoDeta
     """Return full repo metadata plus the 3 most similar repos by embedding."""
     result = await db.execute(select(Repo).where(Repo.id == repo_id))
     repo = result.scalar_one_or_none()
-    if repo is None:
+    if repo is None or is_repo_blocked(
+        owner=repo.owner, name=repo.name, repo_id=repo.id, description=repo.description
+    ):
         raise HTTPException(status_code=404, detail="repo_not_found")
 
     similar_repo_ids: list[str] = []
