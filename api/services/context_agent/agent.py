@@ -52,7 +52,13 @@ def _assemble_markdown(
     topics = metadata.get("topics") or []
     topics_text = ", ".join(topics) if topics else "(none)"
     dep = repo_data.get("dependency_file")
-    dep_label = dep["name"] if dep else "see source"
+    if dep:
+        dep_excerpt = dep["content"][:800].strip()
+        if len(dep["content"]) > 800:
+            dep_excerpt += "\n..."
+        tech_stack = f"```{dep['name']}\n{dep_excerpt}\n```"
+    else:
+        tech_stack = f"- Language: {language}\n- Topics: {topics_text}\n- Dependencies: (none found)"
 
     architecture = "\n".join(f"- {pattern}" for pattern in patterns) if patterns else "- (none identified)"
 
@@ -65,9 +71,7 @@ def _assemble_markdown(
             "## Overview",
             overview,
             "## Tech Stack",
-            f"- Language: {language}",
-            f"- Topics: {topics_text}",
-            f"- Dependencies: {dep_label}",
+            tech_stack,
             "## Architecture",
             architecture,
             "## Rebuild Prompt",
@@ -89,21 +93,29 @@ async def _get_fresh_cache(db: AsyncSession, repo_id: str) -> ContextCache | Non
     return cached
 
 
-async def generate_context(repo_id: str, db: AsyncSession) -> AsyncGenerator[str, None]:
+async def generate_context(
+    repo_id: str,
+    db: AsyncSession,
+    *,
+    skip_cache: bool = False,
+) -> AsyncGenerator[str, None]:
     """Run the context pipeline, yielding progress markers and final markdown."""
     pipeline_start = time.perf_counter()
+    tokens_used = 0
 
-    cached = await _get_fresh_cache(db, repo_id)
-    if cached is not None:
-        logger.info(
-            "agent.cache_hit",
-            repo_id=repo_id,
-            cache_id=cached.id,
-            duration_ms=int((time.perf_counter() - pipeline_start) * 1000),
-        )
-        yield "cache_hit"
-        yield cached.content_md
-        return
+    if not skip_cache:
+        cached = await _get_fresh_cache(db, repo_id)
+        if cached is not None:
+            logger.info(
+                "agent.cache_hit",
+                repo_id=repo_id,
+                cache_id=cached.id,
+                duration_ms=int((time.perf_counter() - pipeline_start) * 1000),
+            )
+            yield "cache_hit"
+            yield "tokens:0"
+            yield cached.content_md
+            return
 
     result = await db.execute(select(Repo).where(Repo.id == repo_id))
     repo = result.scalar_one_or_none()
@@ -119,17 +131,20 @@ async def generate_context(repo_id: str, db: AsyncSession) -> AsyncGenerator[str
 
     step_start = time.perf_counter()
     yield "step:abstraction"
-    abstraction = await identify_core_abstraction(repo_data)
+    abstraction, step_tokens = await identify_core_abstraction(repo_data)
+    tokens_used += step_tokens
     logger.info("agent.step", step="abstraction", duration_ms=int((time.perf_counter() - step_start) * 1000))
 
     step_start = time.perf_counter()
     yield "step:patterns"
-    patterns = await extract_architecture_patterns(repo_data)
+    patterns, step_tokens = await extract_architecture_patterns(repo_data)
+    tokens_used += step_tokens
     logger.info("agent.step", step="patterns", duration_ms=int((time.perf_counter() - step_start) * 1000))
 
     step_start = time.perf_counter()
     yield "step:rebuild_prompt"
-    rebuild_prompt = await generate_rebuild_prompt(repo_data, abstraction, patterns)
+    rebuild_prompt, step_tokens = await generate_rebuild_prompt(repo_data, abstraction, patterns)
+    tokens_used += step_tokens
     logger.info(
         "agent.step", step="rebuild_prompt", duration_ms=int((time.perf_counter() - step_start) * 1000)
     )
@@ -154,6 +169,8 @@ async def generate_context(repo_id: str, db: AsyncSession) -> AsyncGenerator[str
         repo_id=repo_id,
         cache_id=cache_id,
         duration_ms=int((time.perf_counter() - pipeline_start) * 1000),
+        tokens_used=tokens_used,
     )
 
+    yield f"tokens:{tokens_used}"
     yield content_md
