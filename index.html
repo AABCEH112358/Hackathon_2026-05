@@ -9,6 +9,25 @@
 </head>
 
 <body>
+  <div id="landingScreen" class="landing-screen" aria-label="Welcome">
+    <div class="landing-bg" aria-hidden="true"></div>
+    <div class="landing-orbit landing-orbit-a" aria-hidden="true"></div>
+    <div class="landing-orbit landing-orbit-b" aria-hidden="true"></div>
+    <div class="landing-content">
+      <p class="landing-eyebrow">Hackathon 2026</p>
+      <h1 class="landing-title">
+        Welcome to <span class="landing-brand">Repo-Pilot</span>
+      </h1>
+      <p class="landing-tagline">
+        Fly over GitHub worlds, pick a district, and summon AI contribution briefs.
+      </p>
+      <button id="startJourneyButton" type="button" class="landing-cta" disabled>
+        Start Journey
+      </button>
+      <p id="landingLoadHint" class="landing-hint">Preparing your map…</p>
+    </div>
+  </div>
+
   <div id="app">
     <div id="mapLayer" class="map-layer aerial-view"></div>
     <div id="pinsLayer" class="pins-layer"></div>

@@ -61,7 +61,14 @@ const contextReadyMessage = document.getElementById("contextReadyMessage");
 const contextReadyDownload = document.getElementById("contextReadyDownload");
 const contextReadyDismiss = document.getElementById("contextReadyDismiss");
 
+const landingScreen = document.getElementById("landingScreen");
+const startJourneyButton = document.getElementById("startJourneyButton");
+const landingLoadHint = document.getElementById("landingLoadHint");
+const appRoot = document.getElementById("app");
+
 let minimizeDashboardButton = null;
+let journeyStarted = false;
+let layoutReady = false;
 
 let allRepos = [];
 let districts = [];
@@ -88,9 +95,54 @@ const cityRepoPositions = [
 window.addEventListener("DOMContentLoaded", () => {
   setupBranding();
   setupDashboardMinimize();
+  setupLanding();
   attachEventListeners();
   loadRepoLayout();
 });
+
+function setupLanding() {
+  if (!landingScreen || !startJourneyButton) return;
+
+  startJourneyButton.addEventListener("click", startJourney);
+  appRoot?.classList.remove("journey-active");
+}
+
+function startJourney() {
+  if (journeyStarted) return;
+  journeyStarted = true;
+
+  landingScreen?.classList.add("landing-exit");
+  appRoot?.classList.add("journey-active");
+
+  window.setTimeout(() => {
+    landingScreen?.classList.add("hidden");
+  }, 700);
+
+  if (layoutReady && districts.length) {
+    renderAerialWorld();
+  } else {
+    setStatus("Loading your world map…");
+  }
+}
+
+function markLayoutReady() {
+  layoutReady = true;
+  if (landingLoadHint) {
+    landingLoadHint.textContent = "Your map is ready — start when you are!";
+  }
+  startJourneyButton?.removeAttribute("disabled");
+  startJourneyButton?.classList.add("landing-cta-ready");
+
+  if (journeyStarted && currentView === "aerial" && !activeDistrict) {
+    renderAerialWorld();
+  }
+}
+
+function maybeRenderAerialAfterLoad() {
+  if (journeyStarted && currentView === "aerial" && !activeDistrict) {
+    renderAerialWorld();
+  }
+}
 
 function setupBranding() {
   document.title = "RepoPilot";
@@ -270,7 +322,8 @@ async function loadRepoLayout() {
   if (cachedRepos.length) {
     allRepos = cachedRepos;
     districts = buildDistricts(allRepos);
-    renderAerialWorld();
+    markLayoutReady();
+    maybeRenderAerialAfterLoad();
     setStatus(`Loaded ${allRepos.length} repos from cache. Refreshing in background...`);
   }
 
@@ -286,10 +339,8 @@ async function loadRepoLayout() {
     saveCachedRepos(allRepos);
 
     districts = buildDistricts(allRepos);
-
-    if (!cachedRepos.length && currentView === "aerial") {
-      renderAerialWorld();
-    }
+    markLayoutReady();
+    maybeRenderAerialAfterLoad();
 
     setStatus(`Loaded ${allRepos.length} repos across 3 themed districts.`);
 
