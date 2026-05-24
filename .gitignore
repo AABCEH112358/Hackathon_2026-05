@@ -26,5 +26,17 @@ dist-ssr
 .env
 .env.local
 api/.env
+
+# SSH / crypto keys — never commit
+anes
+anes.pub
+*.pem
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.key
+!*.key.example
 .claude/settings.local.json
 /node_modules
+.vercel
