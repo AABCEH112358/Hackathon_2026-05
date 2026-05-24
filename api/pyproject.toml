@@ -1,7 +1,7 @@
 [project]
-name = "github-atlas-api"
+name = "repo-pilot-api"
 version = "0.1.0"
-description = "GitHub Atlas backend — ingestion, layout, ML scoring"
+description = "Repo Pilot backend — ingestion, layout, ML scoring"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -45,3 +45,12 @@ target-version = "py311"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
