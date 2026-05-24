@@ -482,6 +482,194 @@ button:active {
   display: none !important;
 }
 
+.district-pin .pin-marker {
+  background: linear-gradient(180deg, #ffd86b 0%, #e8a020 100%);
+  box-shadow: 0 0 18px rgba(255, 210, 80, 0.65);
+}
+
+.district-pin .pin-pulse {
+  background: rgba(255, 210, 80, 0.45);
+}
+
+.pin-selected .pin-marker {
+  outline: 3px solid rgba(126, 231, 255, 0.95);
+  outline-offset: 2px;
+}
+
+.repo-card-active {
+  border-color: rgba(126, 231, 255, 0.85);
+  background: rgba(126, 231, 255, 0.12);
+}
+
+.district-card {
+  cursor: pointer;
+}
+
+.list-empty {
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.generate-context-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0b1438;
+  cursor: pointer;
+  background: linear-gradient(135deg, #7ee7ff, #9dffb8);
+  box-shadow: 0 8px 22px rgba(126, 231, 255, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.generate-context-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.context-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 10, 40, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.context-modal-card {
+  width: min(420px, 100%);
+  padding: 28px 24px;
+  text-align: center;
+  color: #eaf6ff;
+  border-radius: 24px;
+  background: linear-gradient(160deg, rgba(30, 48, 110, 0.98), rgba(12, 22, 68, 0.98));
+  border: 1px solid rgba(126, 231, 255, 0.35);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.context-modal-emoji {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.context-modal-card h3 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.context-modal-card p {
+  margin: 0 0 20px;
+  opacity: 0.85;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.context-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.context-modal-actions button {
+  padding: 11px 18px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#contextReadyDownload {
+  color: #0b1438;
+  background: linear-gradient(135deg, #7ee7ff, #9dffb8);
+}
+
+.modal-dismiss {
+  color: #eaf6ff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.repo-detail-modal {
+  z-index: 90;
+}
+
+.repo-detail-card {
+  position: relative;
+  text-align: left;
+  max-height: min(90vh, 560px);
+  overflow-y: auto;
+}
+
+.repo-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 12px;
+  font-size: 22px;
+  line-height: 1;
+  color: #eaf6ff;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.repo-modal-close:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.modal-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.repo-detail-card h3 {
+  margin: 0 32px 8px 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.modal-repo-meta {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+.modal-repo-language {
+  margin: 0 0 14px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.modal-stats {
+  margin-bottom: 18px;
+}
+
+.repo-detail-actions {
+  justify-content: stretch;
+  flex-direction: column;
+}
+
+.repo-detail-actions button {
+  width: 100%;
+}
+
+#modalGenerateContext {
+  color: #0b1438;
+  background: linear-gradient(135deg, #7ee7ff, #9dffb8);
+}
+
 @keyframes pulse {
   0% {
     transform: translate(-50%, -50%) scale(0.7);

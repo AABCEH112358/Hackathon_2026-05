@@ -5,6 +5,12 @@ import {
   getRepoId,
   getRepoFullName,
 } from "./api.js";
+import {
+  buildDistricts,
+  searchReposByField,
+  findDistrictForRepo,
+  REPOS_PER_DISTRICT,
+} from "./districts.js";
 
 const mapLayer = document.getElementById("mapLayer");
 const pinsLayer = document.getElementById("pinsLayer");
@@ -28,16 +34,7 @@ const randomControls =
 
 const repoList = document.getElementById("repoList");
 const repoListSection = document.getElementById("repoListSection");
-
-const repoDetails = document.getElementById("repoDetails");
-const selectedRepoName = document.getElementById("selectedRepoName");
-const selectedRepoMeta = document.getElementById("selectedRepoMeta");
-const selectedRepoLanguage = document.getElementById("selectedRepoLanguage");
-const selectedRepoStars = document.getElementById("selectedRepoStars");
-const selectedRepoForks = document.getElementById("selectedRepoForks");
-const selectedRepoTrend = document.getElementById("selectedRepoTrend");
-const districtSection = document.getElementById("districtSection");
-const districtList = document.getElementById("districtList");
+const repoListTitle = document.getElementById("repoListTitle");
 
 const markdownPanel = document.getElementById("markdownPanel");
 const markdownTitle = document.getElementById("markdownTitle");
@@ -45,38 +42,47 @@ const markdownOutput = document.getElementById("markdownOutput");
 const agentErrorBox = document.getElementById("agentErrorBox");
 const downloadMarkdownButton = document.getElementById("downloadMarkdownButton");
 
+const repoDetailModal = document.getElementById("repoDetailModal");
+const repoDetailClose = document.getElementById("repoDetailClose");
+const modalRepoDismiss = document.getElementById("modalRepoDismiss");
+const modalGenerateContext = document.getElementById("modalGenerateContext");
+const modalRepoDistrict = document.getElementById("modalRepoDistrict");
+const modalRepoName = document.getElementById("modalRepoName");
+const modalRepoMeta = document.getElementById("modalRepoMeta");
+const modalRepoLanguage = document.getElementById("modalRepoLanguage");
+const modalRepoStars = document.getElementById("modalRepoStars");
+const modalRepoForks = document.getElementById("modalRepoForks");
+const modalRepoTrend = document.getElementById("modalRepoTrend");
+
 const toast = document.getElementById("toast");
+const contextReadyModal = document.getElementById("contextReadyModal");
+const contextReadyTitle = document.getElementById("contextReadyTitle");
+const contextReadyMessage = document.getElementById("contextReadyMessage");
+const contextReadyDownload = document.getElementById("contextReadyDownload");
+const contextReadyDismiss = document.getElementById("contextReadyDismiss");
 
 let minimizeDashboardButton = null;
 
 let allRepos = [];
-let visibleRepos = [];
+let districts = [];
+let activeDistrict = null;
 let selectedRepo = null;
 let currentView = "aerial";
 let currentMarkdown = "";
 let currentMarkdownFilename = "context.md";
 let activeContextSource = null;
-let currentAerialTitle = "Random Entry Points";
+let currentAerialTitle = "World Map";
+let pendingSearchRepo = null;
 
 const USER_ID_KEY = "repo_map_user_id";
 const REPO_CACHE_KEY = "repopilot_repo_layout_cache_v1";
 
-const CITY_MAPS = [
-  "/assets/map1.png",
-  "/assets/map2.png",
-  "/assets/map3.png",
-];
-
-const AERIAL_PIN_COUNT = 6;
-const CITY_DISTRICT_SIZE = 6;
-
-const cityFilePositions = [
+const cityRepoPositions = [
   { x: 22, y: 38 },
   { x: 39, y: 25 },
   { x: 56, y: 45 },
   { x: 68, y: 31 },
   { x: 47, y: 64 },
-  { x: 30, y: 55 },
 ];
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -202,23 +208,44 @@ function attachEventListeners() {
     }
   });
 
-  randomButton.addEventListener("click", () => {
-    const query = searchInput.value.trim();
-
-    if (query) {
-      pickRandomFromSearch(query);
-    } else {
-      pickAndRenderRandomRepos(allRepos);
-    }
-  });
+  randomButton.addEventListener("click", reshuffleDistricts);
 
   resetButton.addEventListener("click", () => {
     searchInput.value = "";
-    pickAndRenderRandomRepos(allRepos);
+    returnToAerialView();
   });
 
   backButton.addEventListener("click", returnToAerialView);
   downloadMarkdownButton.addEventListener("click", downloadCurrentMarkdown);
+  modalGenerateContext?.addEventListener("click", () => {
+    if (selectedRepo) {
+      hideRepoDetailModal();
+      generateRepoContext(selectedRepo, { name: "context.md" });
+    }
+  });
+  repoDetailClose?.addEventListener("click", hideRepoDetailModal);
+  modalRepoDismiss?.addEventListener("click", hideRepoDetailModal);
+  repoDetailModal?.addEventListener("click", (event) => {
+    if (event.target === repoDetailModal) {
+      hideRepoDetailModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      hideRepoDetailModal();
+      hideContextReadyModal();
+    }
+  });
+  contextReadyDownload?.addEventListener("click", () => {
+    downloadCurrentMarkdown();
+    hideContextReadyModal();
+  });
+  contextReadyDismiss?.addEventListener("click", hideContextReadyModal);
+  contextReadyModal?.addEventListener("click", (event) => {
+    if (event.target === contextReadyModal) {
+      hideContextReadyModal();
+    }
+  });
 
   minimizeDashboardButton.addEventListener("click", toggleDashboardMinimize);
 }
@@ -242,8 +269,9 @@ async function loadRepoLayout() {
 
   if (cachedRepos.length) {
     allRepos = cachedRepos;
-    pickAndRenderRandomRepos(allRepos);
-    setStatus(`Loaded ${allRepos.length} repos instantly from cache. Refreshing in background...`);
+    districts = buildDistricts(allRepos);
+    renderAerialWorld();
+    setStatus(`Loaded ${allRepos.length} repos from cache. Refreshing in background...`);
   }
 
   try {
@@ -257,11 +285,13 @@ async function loadRepoLayout() {
     allRepos = layoutRepos;
     saveCachedRepos(allRepos);
 
+    districts = buildDistricts(allRepos);
+
     if (!cachedRepos.length && currentView === "aerial") {
-      pickAndRenderRandomRepos(allRepos);
+      renderAerialWorld();
     }
 
-    setStatus(`Loaded ${allRepos.length} repos. Showing 3 random entry points.`);
+    setStatus(`Loaded ${allRepos.length} repos across 3 themed districts.`);
 
     loadExtraScoresInBackground();
   } catch (error) {
@@ -319,20 +349,20 @@ async function loadExtraScoresInBackground() {
 
     saveCachedRepos(allRepos);
 
-    visibleRepos = visibleRepos.map((repo) => {
-      const updatedRepo =
-        allRepos.find((item) => item.repoId === repo.repoId) || repo;
-
-      return {
-        ...updatedRepo,
-        cityMap: repo.cityMap,
-        cityMapNumber: repo.cityMapNumber,
-      };
-    });
+    districts = buildDistricts(allRepos);
 
     if (currentView === "aerial") {
-      renderAerialPins(visibleRepos);
-      renderRepoList();
+      renderAerialWorld();
+    } else if (currentView === "city" && activeDistrict) {
+      const refreshed = districts.find((d) => d.id === activeDistrict.id);
+      if (refreshed) {
+        activeDistrict = refreshed;
+        if (selectedRepo) {
+          const updated = refreshed.repos.find((r) => r.repoId === selectedRepo.repoId);
+          if (updated) selectedRepo = updated;
+        }
+        renderDistrictCityView(activeDistrict);
+      }
     }
 
     console.log("Extra scores loaded in background.");
@@ -448,48 +478,38 @@ function normalizeBackendRepo(rawRepo, index = 0) {
     htmlUrl: rawRepo.html_url || rawRepo.htmlUrl || rawRepo.url || "",
     similarRepos: rawRepo.similar_repos || rawRepo.similarRepos || rawRepo.similar || [],
 
-    cityMap: rawRepo.cityMap || CITY_MAPS[0],
-    cityMapNumber: rawRepo.cityMapNumber || 1,
   };
 }
 
-function assignCityMaps(repos) {
-  return repos.map((repo, index) => ({
-    ...repo,
-    cityMap: CITY_MAPS[index % CITY_MAPS.length],
-    cityMapNumber: (index % CITY_MAPS.length) + 1,
-  }));
+function reshuffleDistricts() {
+  if (!allRepos.length) return;
+  const shuffled = pickRandomItems(allRepos, allRepos.length);
+  districts = buildDistricts(shuffled);
+  returnToAerialView();
+  showToast("Districts reshuffled — same themes, new repos.");
 }
 
-function pickAndRenderRandomRepos(sourceRepos) {
-  if (!sourceRepos.length) {
-    visibleRepos = [];
-    selectedRepo = null;
-    clearPins();
-    renderRepoList();
-    setStatus("No repos available to display.");
-    return;
-  }
-
-  visibleRepos = assignCityMaps(pickRandomItems(sourceRepos, AERIAL_PIN_COUNT));
-  selectedRepo = null;
+function renderAerialWorld() {
   currentView = "aerial";
-  currentAerialTitle = "Random Entry Points";
+  activeDistrict = null;
+  selectedRepo = null;
+  pendingSearchRepo = null;
+  currentAerialTitle = "World Map";
 
   dashboardTitle.textContent = currentAerialTitle;
+  if (repoListTitle) repoListTitle.textContent = "Districts";
 
   showAerialControls();
-
   repoListSection.classList.remove("hidden");
-  repoDetails.classList.add("hidden");
   markdownPanel.classList.add("hidden");
+  hideRepoDetailModal();
   backButton.classList.add("hidden");
 
   renderAerialMap();
-  renderAerialPins(visibleRepos);
-  renderRepoList();
+  renderAerialDistrictPins();
+  renderDistrictChooserList();
 
-  setStatus(`Showing ${visibleRepos.length} repo districts on the map. Click any pin to fly in.`);
+  setStatus("Pick a district — Castle (AI), Desert (cyber), or Volcano (math & CS).");
 }
 
 function pickRandomItems(items, count) {
@@ -503,29 +523,95 @@ function pickRandomItems(items, count) {
   return copy.slice(0, Math.min(count, copy.length));
 }
 
-function renderRepoList() {
+function renderDistrictChooserList() {
   repoList.innerHTML = "";
 
-  if (!visibleRepos.length) {
-    repoList.innerHTML = `<p>No repos found.</p>`;
+  if (!districts.length) {
+    repoList.innerHTML = `<p class="list-empty">No districts loaded yet.</p>`;
     return;
   }
 
-  visibleRepos.forEach((repo, index) => {
+  districts.forEach((district) => {
     const card = document.createElement("article");
-    card.className = "repo-card";
+    card.className = "repo-card district-card";
+
+    card.innerHTML = `
+      <strong>${district.emoji} ${escapeHtml(district.name)}</strong>
+      <p>${escapeHtml(district.theme)}</p>
+      <div class="repo-tags">
+        <span class="repo-tag">${REPOS_PER_DISTRICT} repos</span>
+        <span class="repo-tag">Enter district →</span>
+      </div>
+    `;
+
+    card.addEventListener("click", () => flyIntoDistrict(district));
+    repoList.appendChild(card);
+  });
+}
+
+function renderDistrictRepoList(district) {
+  if (!repoList) return;
+  repoList.innerHTML = "";
+
+  district.repos.forEach((repo, index) => {
+    const isSelected =
+      selectedRepo &&
+      (selectedRepo.repoId === repo.repoId || selectedRepo.fullName === repo.fullName);
+
+    const card = document.createElement("article");
+    card.className = `repo-card${isSelected ? " repo-card-active" : ""}`;
 
     card.innerHTML = `
       <strong>${index + 1}. ${escapeHtml(repo.name)}</strong>
       <p>${escapeHtml(repo.fullName)}</p>
       <div class="repo-tags">
-        <span class="repo-tag">${escapeHtml(repo.language)}</span>
-        <span class="repo-tag">★ ${formatNumber(repo.stars)}</span>
-        <span class="repo-tag">trend ${toNumber(repo.trendingScore, 0).toFixed(2)}</span>
+        <span class="repo-tag">${escapeHtml(repo.language || "—")}</span>
+        <span class="repo-tag">★ ${formatCompactNumber(repo.stars)}</span>
       </div>
     `;
 
-    card.addEventListener("click", () => flyIntoRepo(repo));
+    card.addEventListener("click", () => selectRepoInDistrict(repo));
+    repoList.appendChild(card);
+  });
+}
+
+function renderSearchResults(matches, query) {
+  currentView = "aerial";
+  activeDistrict = null;
+  selectedRepo = null;
+  currentAerialTitle = `Search: ${query}`;
+
+  dashboardTitle.textContent = currentAerialTitle;
+  if (repoListTitle) repoListTitle.textContent = `Matches (${matches.length})`;
+
+  showAerialControls();
+  repoListSection.classList.remove("hidden");
+  markdownPanel.classList.add("hidden");
+  hideRepoDetailModal();
+  backButton.classList.add("hidden");
+
+  renderAerialMap();
+  clearPins();
+
+  setStatus(`Found ${matches.length} repos for "${query}". Click one to enter its district.`);
+
+  repoList.innerHTML = "";
+
+  matches.slice(0, 25).forEach((repo) => {
+    const district = findDistrictForRepo(districts, repo);
+    const card = document.createElement("article");
+    card.className = "repo-card";
+
+    card.innerHTML = `
+      <strong>${escapeHtml(repo.name)}</strong>
+      <p>${escapeHtml(repo.fullName)}</p>
+      <div class="repo-tags">
+        <span class="repo-tag">${district ? district.emoji + " " + district.name : "—"}</span>
+        <span class="repo-tag">★ ${formatCompactNumber(repo.stars)}</span>
+      </div>
+    `;
+
+    card.addEventListener("click", () => openRepoFromSearch(repo));
     repoList.appendChild(card);
   });
 }
@@ -541,32 +627,33 @@ function renderAerialMap() {
   clearPins();
 }
 
-function renderAerialPins(repos) {
+function renderAerialDistrictPins() {
   clearPins();
 
-  repos.forEach((repo) => {
-    const position = tileToScreenPosition(repo.tileX, repo.tileY);
+  const width = pinsLayer.clientWidth || window.innerWidth;
+  const height = pinsLayer.clientHeight || window.innerHeight;
 
+  districts.forEach((district) => {
     createPin({
-      x: position.x,
-      y: position.y,
-      title: repo.name,
-      subtitle: `${repo.language} • trend ${toNumber(repo.trendingScore, 0).toFixed(2)}`,
-      height: repo.height,
-      className: "repo-pin",
-      onClick: () => flyIntoRepo(repo),
+      x: (district.aerial.x / 100) * width,
+      y: (district.aerial.y / 100) * height,
+      title: `${district.emoji} ${district.name}`,
+      subtitle: district.theme,
+      height: 5,
+      className: "district-pin",
+      onClick: () => flyIntoDistrict(district),
     });
   });
 }
 
-function tileToScreenPosition(tileX, tileY) {
-  const width = pinsLayer.clientWidth || window.innerWidth;
-  const height = pinsLayer.clientHeight || window.innerHeight;
-
-  return {
-    x: (clamp(tileX, 0, 63) / 63) * width,
-    y: (clamp(tileY, 0, 63) / 63) * height,
-  };
+function openRepoFromSearch(repo) {
+  const district = findDistrictForRepo(districts, repo);
+  if (!district) {
+    showToast("Could not find a district for this repo.");
+    return;
+  }
+  pendingSearchRepo = repo;
+  flyIntoDistrict(district);
 }
 
 function createPin({ x, y, title, subtitle, height = 1, className = "", onClick }) {
@@ -591,48 +678,121 @@ function createPin({ x, y, title, subtitle, height = 1, className = "", onClick 
   pinsLayer.appendChild(pin);
 }
 
-function flyIntoRepo(repo) {
-  if (!repo) return;
+function flyIntoDistrict(district) {
+  if (!district) return;
 
-  selectedRepo = repo;
+  activeDistrict = district;
+  selectedRepo = null;
   currentView = "transitioning";
-
-  logRepoAction(repo, "click", 0);
 
   clearPins();
   mapLayer.classList.add("flying");
-
-  setStatus(`Flying into ${repo.name}...`);
+  setStatus(`Flying into ${district.name}...`);
 
   window.setTimeout(() => {
-    renderCityView(repo);
-    loadRepoDetails(repo);
+    renderDistrictCityView(district);
+    if (pendingSearchRepo) {
+      const target = district.repos.find(
+        (r) =>
+          r.repoId === pendingSearchRepo.repoId ||
+          r.fullName === pendingSearchRepo.fullName
+      );
+      pendingSearchRepo = null;
+      if (target) selectRepoInDistrict(target);
+    }
   }, 720);
 }
 
-function renderCityView(repo) {
+function renderDistrictCityView(district) {
   currentView = "city";
+  activeDistrict = district;
 
   mapLayer.classList.remove("aerial-view", "flying");
   mapLayer.classList.add("city-view", "city-active");
+  mapLayer.style.backgroundImage = `url("${district.map}")`;
 
-  mapLayer.style.backgroundImage = `url("${repo.cityMap}")`;
-
-  dashboardTitle.textContent = "City View";
+  dashboardTitle.textContent = `${district.emoji} ${district.name}`;
+  if (repoListTitle) repoListTitle.textContent = `Repos in district (${district.repos.length})`;
 
   hideCityControls();
-
-  repoListSection.classList.add("hidden");
-  repoDetails.classList.remove("hidden");
+  repoListSection.classList.remove("hidden");
   markdownPanel.classList.add("hidden");
+  hideRepoDetailModal();
   backButton.classList.remove("hidden");
 
-  updateSelectedRepoDetails(repo);
-  renderCityDistrict(repo);
+  renderDistrictRepoPins(district);
+  renderDistrictRepoList(district);
 
-  setStatus(
-    `District loaded — ${buildCityDistrict(repo).length} repos. Gold pin = AI brief.`
-  );
+  setStatus(`${district.theme} — click a pin or list item to open repo details.`);
+}
+
+function selectRepoInDistrict(repo) {
+  if (!repo || !activeDistrict) return;
+
+  selectedRepo = repo;
+  logRepoAction(repo, "click", 0);
+
+  showRepoDetailModal(repo);
+  renderDistrictRepoPins(activeDistrict);
+  renderDistrictRepoList(activeDistrict);
+  loadRepoDetails(repo);
+
+  setStatus(`${repo.name} — generate context.md or close to keep exploring.`);
+}
+
+function showRepoDetailModal(repo) {
+  if (!repoDetailModal) return;
+
+  updateRepoModalContent(repo);
+  repoDetailModal.classList.remove("hidden");
+}
+
+function hideRepoDetailModal() {
+  repoDetailModal?.classList.add("hidden");
+}
+
+function updateRepoModalContent(repo) {
+  const districtLabel = activeDistrict
+    ? `${activeDistrict.emoji} ${activeDistrict.name} · ${activeDistrict.theme}`
+    : repo.districtName || "District";
+
+  if (modalRepoDistrict) modalRepoDistrict.textContent = districtLabel;
+  if (modalRepoName) modalRepoName.textContent = repo.name || "Repository";
+  if (modalRepoMeta) {
+    modalRepoMeta.textContent = repo.description || repo.fullName || "";
+  }
+  if (modalRepoLanguage) {
+    modalRepoLanguage.textContent = repo.language
+      ? `${repo.language} · ${repo.fullName || ""}`
+      : repo.fullName || "";
+  }
+  if (modalRepoStars) modalRepoStars.textContent = formatCompactNumber(repo.stars);
+  if (modalRepoForks) modalRepoForks.textContent = formatCompactNumber(repo.forks);
+  if (modalRepoTrend) modalRepoTrend.textContent = formatTrendLabel(repo.trendingScore);
+}
+
+function renderDistrictRepoPins(district) {
+  clearPins();
+
+  const width = pinsLayer.clientWidth || window.innerWidth;
+  const height = pinsLayer.clientHeight || window.innerHeight;
+
+  district.repos.forEach((repo, index) => {
+    const position = cityRepoPositions[index % cityRepoPositions.length];
+    const isSelected =
+      selectedRepo &&
+      (selectedRepo.repoId === repo.repoId || selectedRepo.fullName === repo.fullName);
+
+    createPin({
+      x: (position.x / 100) * width,
+      y: (position.y / 100) * height,
+      title: repo.name,
+      subtitle: `${repo.language || "repo"} · ★ ${formatCompactNumber(repo.stars)}`,
+      height: Math.min(6, 2 + Math.floor((repo.stars || 0) / 80000)),
+      className: `repo-pin${isSelected ? " pin-selected" : ""}`,
+      onClick: () => selectRepoInDistrict(repo),
+    });
+  });
 }
 
 function hideCityControls() {
@@ -676,133 +836,18 @@ async function loadRepoDetails(repo) {
       [];
 
     selectedRepo = normalizedDetails;
-    updateSelectedRepoDetails(normalizedDetails);
-    if (currentView === "city") {
-      renderCityDistrict(normalizedDetails);
+    if (repoDetailModal && !repoDetailModal.classList.contains("hidden")) {
+      updateRepoModalContent(normalizedDetails);
+    }
+    if (currentView === "city" && activeDistrict) {
+      renderDistrictRepoPins(activeDistrict);
+      renderDistrictRepoList(activeDistrict);
     }
 
     console.log("Repo details loaded:", detailPayload);
   } catch (error) {
     console.warn("Could not load full repo detail. Using layout data.", error);
   }
-}
-
-function updateSelectedRepoDetails(repo) {
-  selectedRepoName.textContent = repo.name;
-  selectedRepoMeta.textContent = repo.description || repo.fullName || "";
-  selectedRepoLanguage.textContent = repo.language
-    ? `${repo.language} · ${repo.fullName}`
-    : repo.fullName || "";
-
-  selectedRepoStars.textContent = formatCompactNumber(repo.stars);
-  selectedRepoForks.textContent = formatCompactNumber(repo.forks);
-  selectedRepoTrend.textContent = formatTrendLabel(repo.trendingScore);
-
-  renderDistrictList(repo);
-}
-
-function findRepoById(repoId) {
-  if (!repoId) return null;
-  return (
-    allRepos.find(
-      (item) =>
-        item.repoId === repoId ||
-        item.fullName === repoId ||
-        item.id === repoId
-    ) || null
-  );
-}
-
-function buildCityDistrict(primaryRepo) {
-  const district = [];
-  const seen = new Set();
-
-  const addRepo = (repo) => {
-    if (!repo) return;
-    const key = repo.repoId || repo.fullName;
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    district.push(repo);
-  };
-
-  addRepo(primaryRepo);
-
-  for (const similarId of primaryRepo.similarRepos || []) {
-    addRepo(findRepoById(similarId));
-  }
-
-  for (const neighbor of visibleRepos) {
-    addRepo(neighbor);
-  }
-
-  if (district.length < CITY_DISTRICT_SIZE) {
-    const fillers = pickRandomItems(
-      allRepos.filter((item) => !seen.has(item.repoId)),
-      CITY_DISTRICT_SIZE - district.length
-    );
-    fillers.forEach(addRepo);
-  }
-
-  return district.slice(0, CITY_DISTRICT_SIZE);
-}
-
-function renderDistrictList(primaryRepo) {
-  if (!districtSection || !districtList) return;
-
-  const district = buildCityDistrict(primaryRepo);
-  districtSection.classList.remove("hidden");
-  districtList.innerHTML = "";
-
-  district.forEach((repo) => {
-    const isPrimary = (repo.repoId || repo.fullName) === (primaryRepo.repoId || primaryRepo.fullName);
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = `district-row${isPrimary ? " district-row-active" : ""}`;
-    row.innerHTML = `
-      <strong>${escapeHtml(repo.name)}</strong>
-      <span>${escapeHtml(repo.language || "—")} · ★ ${formatCompactNumber(repo.stars)}</span>
-    `;
-    row.addEventListener("click", () => {
-      if (isPrimary) {
-        generateRepoContext(repo, { name: "context.md" });
-      } else {
-        flyIntoRepo(repo);
-      }
-    });
-    districtList.appendChild(row);
-  });
-}
-
-function renderCityDistrict(primaryRepo) {
-  clearPins();
-
-  const district = buildCityDistrict(primaryRepo);
-  const width = pinsLayer.clientWidth || window.innerWidth;
-  const height = pinsLayer.clientHeight || window.innerHeight;
-
-  district.forEach((repo, index) => {
-    const position = cityFilePositions[index % cityFilePositions.length];
-    const isPrimary =
-      (repo.repoId || repo.fullName) === (primaryRepo.repoId || primaryRepo.fullName);
-
-    createPin({
-      x: (position.x / 100) * width,
-      y: (position.y / 100) * height,
-      title: isPrimary ? "context.md" : repo.name,
-      subtitle: isPrimary ? "Summon AI agent" : `${repo.language || "repo"} · ★ ${formatCompactNumber(repo.stars)}`,
-      height: isPrimary ? 4 : Math.min(6, 2 + Math.floor((repo.stars || 0) / 50000)),
-      className: isPrimary ? "file-pin pin-primary" : "repo-pin pin-neighbor",
-      onClick: () => {
-        if (isPrimary) {
-          generateRepoContext(repo, { name: "context.md" });
-        } else {
-          flyIntoRepo(repo);
-        }
-      },
-    });
-  });
-
-  renderDistrictList(primaryRepo);
 }
 
 function formatAgentError(rawMessage) {
@@ -894,6 +939,7 @@ function generateRepoContext(repo, file) {
   hideAgentError();
   markdownOutput.textContent = "🛫 Summoning the context agent...\n";
   markdownPanel.classList.remove("hidden");
+  repoListSection?.classList.add("hidden");
   showToast(`Waking the agent for ${repo.name}...`);
 
   activeContextSource = api.streamRepoContext(repoId, {
@@ -911,6 +957,7 @@ function generateRepoContext(repo, file) {
       hideAgentError();
       const cached = meta?.cached ? " (from cache)" : "";
       showToast(`Agent delivered context.md${cached} ✨`);
+      showContextReadyModal(repo, cached);
     },
     onError: (error) => {
       activeContextSource = null;
@@ -951,72 +998,52 @@ function handleSearch() {
   const query = searchInput.value.trim();
 
   if (!query) {
-    pickAndRenderRandomRepos(allRepos);
+    returnToAerialView();
     return;
   }
 
-  pickRandomFromSearch(query);
-}
+  if (!allRepos.length) {
+    showToast("Repos still loading — try again in a moment.");
+    return;
+  }
 
-function pickRandomFromSearch(query) {
-  const normalizedQuery = query.toLowerCase();
-
-  const matches = allRepos.filter((repo) => {
-    return (
-      safeIncludes(repo.name, normalizedQuery) ||
-      safeIncludes(repo.fullName, normalizedQuery) ||
-      safeIncludes(repo.owner, normalizedQuery) ||
-      safeIncludes(repo.language, normalizedQuery) ||
-      safeIncludes(repo.description, normalizedQuery)
-    );
-  });
+  const matches = searchReposByField(allRepos, query);
 
   if (!matches.length) {
-    setStatus(`No matches found for "${query}". Showing random repos instead.`);
-    showToast(`No matches for "${query}".`);
-    pickAndRenderRandomRepos(allRepos);
+    setStatus(`No matches for "${query}". Try: AI, cybersecurity, math, python.`);
+    showToast(`No field matches for "${query}".`);
     return;
   }
 
-  visibleRepos = assignCityMaps(pickRandomItems(matches, AERIAL_PIN_COUNT));
-  selectedRepo = null;
-  currentView = "aerial";
-  currentAerialTitle = "Search Entry Points";
-
-  renderAerialMap();
-  renderAerialPins(visibleRepos);
-  renderRepoList();
-
-  dashboardTitle.textContent = currentAerialTitle;
-
-  showAerialControls();
-
-  repoListSection.classList.remove("hidden");
-  repoDetails.classList.add("hidden");
-  markdownPanel.classList.add("hidden");
-  backButton.classList.add("hidden");
-
-  setStatus(`Found ${matches.length} matches for "${query}". Showing up to ${AERIAL_PIN_COUNT} random matches.`);
+  renderSearchResults(matches, query);
 }
 
 function returnToAerialView() {
-  currentView = "aerial";
+  activeDistrict = null;
   selectedRepo = null;
+  pendingSearchRepo = null;
+  searchInput.value = "";
+  hideRepoDetailModal();
+  repoListSection?.classList.remove("hidden");
+  renderAerialWorld();
+}
 
-  dashboardTitle.textContent = currentAerialTitle;
+function showContextReadyModal(repo, cachedSuffix = "") {
+  if (!contextReadyModal) return;
 
-  showAerialControls();
+  const name = repo?.name || "repo";
+  if (contextReadyTitle) {
+    contextReadyTitle.textContent = `${name} — context.md is ready!`;
+  }
+  if (contextReadyMessage) {
+    contextReadyMessage.textContent = `Your AI contribution brief${cachedSuffix} is ready to download.`;
+  }
 
-  repoListSection.classList.remove("hidden");
-  repoDetails.classList.add("hidden");
-  markdownPanel.classList.add("hidden");
-  districtSection?.classList.add("hidden");
-  backButton.classList.add("hidden");
+  contextReadyModal.classList.remove("hidden");
+}
 
-  renderAerialMap();
-  renderAerialPins(visibleRepos);
-
-  setStatus(`Back to aerial view. Showing ${visibleRepos.length} entry points.`);
+function hideContextReadyModal() {
+  contextReadyModal?.classList.add("hidden");
 }
 
 function logRepoAction(repo, action, durationMs = 0) {
@@ -1157,10 +1184,10 @@ function escapeHtml(value) {
 
 window.addEventListener("resize", () => {
   if (currentView === "aerial") {
-    renderAerialPins(visibleRepos);
+    renderAerialDistrictPins();
   }
 
-  if (currentView === "city" && selectedRepo) {
-    renderCityFilePins(selectedRepo);
+  if (currentView === "city" && activeDistrict) {
+    renderDistrictRepoPins(activeDistrict);
   }
 });

@@ -25,7 +25,7 @@
 
       <div class="dashboard-header">
         <p class="eyebrow">RepoPilot</p>
-        <h1 id="dashboardTitle">Random Entry Points</h1>
+        <h1 id="dashboardTitle">World Map</h1>
         <p id="statusText">Loading repo layout from API...</p>
       </div>
 
@@ -33,14 +33,14 @@
         <input
           id="searchInput"
           type="text"
-          placeholder="Search repo, owner, language..."
+          placeholder="Field: AI, cybersecurity, math, python..."
         />
         <button id="searchButton" type="button">Search</button>
       </div>
 
       <div id="randomControls" class="button-row">
-        <button id="randomButton" type="button">Randomize 6</button>
-        <button id="resetButton" type="button">Reset</button>
+        <button id="randomButton" type="button">Reshuffle</button>
+        <button id="resetButton" type="button">World map</button>
       </div>
 
       <button id="backButton" class="hidden" type="button">
@@ -48,40 +48,8 @@
       </button>
 
       <section id="repoListSection">
-        <h2>Selected entry points</h2>
+        <h2 id="repoListTitle">Districts</h2>
         <div id="repoList" class="repo-list"></div>
-      </section>
-
-      <section id="repoDetails" class="repo-details hidden">
-        <h2 id="selectedRepoName">Repo Name</h2>
-        <p id="selectedRepoMeta"></p>
-        <p id="selectedRepoLanguage" class="repo-language"></p>
-
-        <div class="stats-grid stats-grid-3">
-          <div>
-            <span>Stars</span>
-            <strong id="selectedRepoStars">-</strong>
-          </div>
-
-          <div>
-            <span>Forks</span>
-            <strong id="selectedRepoForks">-</strong>
-          </div>
-
-          <div>
-            <span>Trending</span>
-            <strong id="selectedRepoTrend">-</strong>
-          </div>
-        </div>
-
-        <section id="districtSection" class="district-section hidden">
-          <h2>In this district</h2>
-          <div id="districtList" class="district-list"></div>
-        </section>
-
-        <p class="hint">
-          Gold pin = AI context.md. Blue pins = fly to a neighbor repo.
-        </p>
       </section>
 
       <section id="markdownPanel" class="markdown-panel hidden">
@@ -98,6 +66,48 @@
     </aside>
 
     <div id="toast" class="toast hidden"></div>
+
+    <div id="repoDetailModal" class="context-modal repo-detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalRepoName">
+      <div class="context-modal-card repo-detail-card">
+        <button id="repoDetailClose" type="button" class="repo-modal-close" aria-label="Close">×</button>
+        <p class="modal-eyebrow" id="modalRepoDistrict">District</p>
+        <h3 id="modalRepoName">Repo Name</h3>
+        <p id="modalRepoMeta" class="modal-repo-meta"></p>
+        <p id="modalRepoLanguage" class="modal-repo-language"></p>
+
+        <div class="stats-grid stats-grid-3 modal-stats">
+          <div>
+            <span>Stars</span>
+            <strong id="modalRepoStars">-</strong>
+          </div>
+          <div>
+            <span>Forks</span>
+            <strong id="modalRepoForks">-</strong>
+          </div>
+          <div>
+            <span>Trending</span>
+            <strong id="modalRepoTrend">-</strong>
+          </div>
+        </div>
+
+        <div class="context-modal-actions repo-detail-actions">
+          <button id="modalGenerateContext" type="button">✨ Generate context.md</button>
+          <button id="modalRepoDismiss" type="button" class="modal-dismiss">Back to map</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="contextReadyModal" class="context-modal hidden" role="dialog" aria-modal="true">
+      <div class="context-modal-card">
+        <div class="context-modal-emoji">📜</div>
+        <h3 id="contextReadyTitle">context.md is ready!</h3>
+        <p id="contextReadyMessage">Your AI contribution brief is ready to download.</p>
+        <div class="context-modal-actions">
+          <button id="contextReadyDownload" type="button">Download .md</button>
+          <button id="contextReadyDismiss" type="button" class="modal-dismiss">Later</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
