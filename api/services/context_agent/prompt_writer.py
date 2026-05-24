@@ -56,13 +56,13 @@ async def generate_rebuild_prompt(
     repo_data: dict[str, Any],
     abstraction: str,
     patterns: list[str],
-) -> str:
+) -> tuple[str, int]:
     repo_name = repo_data["metadata"]["name"]
     system = REBUILD_PROMPT_WRITER_PROMPT.format(repo_name=repo_name)
     user_message = _build_rebuild_user_message(repo_data, abstraction, patterns)
     input_chars = len(user_message)
 
-    result = await chat_completion(
+    result, tokens_used = await chat_completion(
         model=MODEL_QUALITY,
         system=system,
         user_message=user_message,
@@ -74,5 +74,6 @@ async def generate_rebuild_prompt(
         repo_name=repo_name,
         input_chars=input_chars,
         output_chars=len(result),
+        tokens_used=tokens_used,
     )
-    return result
+    return result, tokens_used

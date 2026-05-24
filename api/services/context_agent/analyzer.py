@@ -59,11 +59,11 @@ def _parse_pattern_lines(text: str) -> list[str]:
     return patterns
 
 
-async def identify_core_abstraction(repo_data: dict[str, Any]) -> str:
+async def identify_core_abstraction(repo_data: dict[str, Any]) -> tuple[str, int]:
     user_message = _build_core_abstraction_user_message(repo_data)
     input_chars = len(user_message)
 
-    result = await chat_completion(
+    result, tokens_used = await chat_completion(
         model=MODEL_FAST,
         system=CORE_ABSTRACTION_PROMPT,
         user_message=user_message,
@@ -74,15 +74,16 @@ async def identify_core_abstraction(repo_data: dict[str, Any]) -> str:
         "analyzer.core_abstraction",
         input_chars=input_chars,
         output_chars=len(result),
+        tokens_used=tokens_used,
     )
-    return result
+    return result, tokens_used
 
 
-async def extract_architecture_patterns(repo_data: dict[str, Any]) -> list[str]:
+async def extract_architecture_patterns(repo_data: dict[str, Any]) -> tuple[list[str], int]:
     user_message = _build_architecture_user_message(repo_data)
     input_chars = len(user_message)
 
-    text = await chat_completion(
+    text, tokens_used = await chat_completion(
         model=MODEL_FAST,
         system=ARCHITECTURE_PATTERNS_PROMPT,
         user_message=user_message,
@@ -95,5 +96,6 @@ async def extract_architecture_patterns(repo_data: dict[str, Any]) -> list[str]:
         "analyzer.architecture_patterns",
         input_chars=input_chars,
         output_chars=output_chars,
+        tokens_used=tokens_used,
     )
-    return result
+    return result, tokens_used

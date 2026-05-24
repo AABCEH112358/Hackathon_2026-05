@@ -42,7 +42,7 @@ async def chat_completion(
     system: str,
     user_message: str,
     max_tokens: int,
-) -> str:
+) -> tuple[str, int]:
     response = await _get_client().chat.completions.create(
         model=model,
         max_tokens=max_tokens,
@@ -52,4 +52,5 @@ async def chat_completion(
         ],
     )
     content = response.choices[0].message.content
-    return (content or "").strip()
+    tokens_used = response.usage.total_tokens if response.usage else 0
+    return (content or "").strip(), tokens_used
