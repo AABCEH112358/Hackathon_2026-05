@@ -162,4 +162,71 @@ export const api = {
     const encoded = encodeRepoFullName(fullName);
     return apiFetch(`/api/repos/${encoded}`, {}, 15000);
   },
+
+  /**
+   * Stream context.md generation via SSE.
+   * Returns the EventSource — call .close() to cancel.
+   */
+  streamRepoContext(repoId, { onProgress, onChunk, onComplete, onError, regenerate = false } = {}) {
+    const params = new URLSearchParams({ repo_id: repoId });
+    if (regenerate) {
+      params.set("regenerate", "true");
+    }
+
+    const url = `${API_BASE_URL}/api/context/generate?${params.toString()}`;
+    const source = new EventSource(url);
+
+    source.addEventListener("progress", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onProgress?.(data.message || "Working...");
+      } catch (error) {
+        console.warn("Invalid progress SSE payload", error);
+      }
+    });
+
+    source.addEventListener("chunk", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onChunk?.(data.content || "");
+      } catch (error) {
+        console.warn("Invalid chunk SSE payload", error);
+      }
+    });
+
+    source.addEventListener("complete", (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onComplete?.(data);
+      } catch (error) {
+        onComplete?.({});
+      } finally {
+        source.close();
+      }
+    });
+
+    source.addEventListener("error", (event) => {
+      let message = "Context generation failed";
+      try {
+        if (event.data) {
+          const data = JSON.parse(event.data);
+          message = data.message || message;
+        }
+      } catch {
+        // use default message
+      }
+      source.close();
+      onError?.(new Error(message));
+    });
+
+    source.onerror = () => {
+      if (source.readyState === EventSource.CLOSED) {
+        return;
+      }
+      source.close();
+      onError?.(new Error("Lost connection to context generator"));
+    };
+
+    return source;
+  },
 };

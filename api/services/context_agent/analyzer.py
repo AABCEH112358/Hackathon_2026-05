@@ -10,6 +10,7 @@ from services.context_agent.llm import MODEL_FAST, chat_completion
 from services.context_agent.prompts import (
     ARCHITECTURE_PATTERNS_PROMPT,
     CORE_ABSTRACTION_PROMPT,
+    WHY_CONTRIBUTE_PROMPT,
 )
 
 logger = structlog.get_logger(__name__)
@@ -99,3 +100,42 @@ async def extract_architecture_patterns(repo_data: dict[str, Any]) -> tuple[list
         tokens_used=tokens_used,
     )
     return result, tokens_used
+
+
+def _build_why_contribute_user_message(repo_data: dict[str, Any], abstraction: str) -> str:
+    metadata = repo_data["metadata"]
+    readme = (repo_data.get("readme") or "")[:2500]
+    topics = metadata.get("topics") or []
+    topics_text = ", ".join(topics) if topics else "(none)"
+    return "\n\n".join(
+        [
+            f"## Core abstraction\n{abstraction}",
+            "## Metadata",
+            f"Name: {metadata.get('name')}",
+            f"Description: {metadata.get('description') or '(none)'}",
+            f"Language: {metadata.get('language') or 'unknown'}",
+            f"Topics: {topics_text}",
+            f"Stars: {metadata.get('stars', 0)}",
+            f"License: {metadata.get('license') or 'unknown'}",
+            f"## README excerpt\n{readme}",
+        ]
+    )
+
+
+async def generate_why_contribute(
+    repo_data: dict[str, Any], abstraction: str
+) -> tuple[str, int]:
+    user_message = _build_why_contribute_user_message(repo_data, abstraction)
+    result, tokens_used = await chat_completion(
+        model=MODEL_FAST,
+        system=WHY_CONTRIBUTE_PROMPT,
+        user_message=user_message,
+        max_tokens=400,
+    )
+    logger.info(
+        "analyzer.why_contribute",
+        input_chars=len(user_message),
+        output_chars=len(result),
+        tokens_used=tokens_used,
+    )
+    return result.strip(), tokens_used

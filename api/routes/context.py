@@ -21,6 +21,7 @@ STEP_SSE: dict[str, tuple[str, str]] = {
     "step:reading": ("reading", "Reading repo structure..."),
     "step:abstraction": ("analyzing", "Identifying core abstraction..."),
     "step:patterns": ("analyzing", "Identifying patterns..."),
+    "step:why_contribute": ("analyzing", "Explaining why to contribute..."),
     "step:rebuild_prompt": ("generating", "Generating rebuild prompt..."),
     "step:assembling": ("assembling", "Assembling final context..."),
 }

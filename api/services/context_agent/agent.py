@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import ContextCache, Repo
 from services.context_agent.analyzer import (
     extract_architecture_patterns,
+    generate_why_contribute,
     identify_core_abstraction,
 )
 from services.context_agent.prompt_writer import generate_rebuild_prompt
@@ -22,7 +23,7 @@ from services.context_agent.repo_reader import fetch_repo_data
 logger = structlog.get_logger(__name__)
 
 CACHE_TTL = timedelta(hours=24)
-MODEL_VERSION = "gpt-4o-mini+gpt-4o"
+MODEL_VERSION = "gpt-4o-mini+gpt-4o+why-contribute-v2"
 
 
 def _is_cache_fresh(generated_at: datetime) -> bool:
@@ -43,6 +44,7 @@ def _assemble_overview(abstraction: str, patterns: list[str]) -> str:
 def _assemble_markdown(
     repo_data: dict[str, Any],
     abstraction: str,
+    why_contribute: str,
     patterns: list[str],
     rebuild_prompt: str,
 ) -> str:
@@ -68,8 +70,10 @@ def _assemble_markdown(
         [
             f"# {name}",
             f"> {abstraction}",
-            "## Overview",
+            "## What This Project Is",
             overview,
+            "## Why Contribute",
+            why_contribute,
             "## Tech Stack",
             tech_stack,
             "## Architecture",
@@ -89,6 +93,8 @@ async def _get_fresh_cache(db: AsyncSession, repo_id: str) -> ContextCache | Non
     )
     cached = result.scalar_one_or_none()
     if cached is None or not _is_cache_fresh(cached.generated_at):
+        return None
+    if cached.model_version != MODEL_VERSION:
         return None
     return cached
 
@@ -142,6 +148,14 @@ async def generate_context(
     logger.info("agent.step", step="patterns", duration_ms=int((time.perf_counter() - step_start) * 1000))
 
     step_start = time.perf_counter()
+    yield "step:why_contribute"
+    why_contribute, step_tokens = await generate_why_contribute(repo_data, abstraction)
+    tokens_used += step_tokens
+    logger.info(
+        "agent.step", step="why_contribute", duration_ms=int((time.perf_counter() - step_start) * 1000)
+    )
+
+    step_start = time.perf_counter()
     yield "step:rebuild_prompt"
     rebuild_prompt, step_tokens = await generate_rebuild_prompt(repo_data, abstraction, patterns)
     tokens_used += step_tokens
@@ -151,7 +165,7 @@ async def generate_context(
 
     step_start = time.perf_counter()
     yield "step:assembling"
-    content_md = _assemble_markdown(repo_data, abstraction, patterns, rebuild_prompt)
+    content_md = _assemble_markdown(repo_data, abstraction, why_contribute, patterns, rebuild_prompt)
     logger.info("agent.step", step="assembling", duration_ms=int((time.perf_counter() - step_start) * 1000))
 
     cache_id = f"{repo_id}:{datetime.now(UTC).isoformat()}"

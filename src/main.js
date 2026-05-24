@@ -51,7 +51,8 @@ let visibleRepos = [];
 let selectedRepo = null;
 let currentView = "aerial";
 let currentMarkdown = "";
-let currentMarkdownFilename = "repo-file.md";
+let currentMarkdownFilename = "context.md";
+let activeContextSource = null;
 let currentAerialTitle = "Random Entry Points";
 
 const USER_ID_KEY = "repo_map_user_id";
@@ -622,7 +623,7 @@ function renderCityView(repo) {
   updateSelectedRepoDetails(repo);
   renderCityFilePins(repo);
 
-  setStatus("City view loaded. Click a file pin to generate markdown.");
+  setStatus("City view loaded. Click the context pin to generate context.md.");
 }
 
 function hideCityControls() {
@@ -688,116 +689,62 @@ function updateSelectedRepoDetails(repo) {
 function renderCityFilePins(repo) {
   clearPins();
 
-  const files = getPlaceholderFilesForRepo(repo);
+  const file = { name: "context.md", role: "why contribute + rebuild guide" };
+  const position = cityFilePositions[2];
+  const width = pinsLayer.clientWidth || window.innerWidth;
+  const height = pinsLayer.clientHeight || window.innerHeight;
 
-  files.forEach((file, index) => {
-    const position = cityFilePositions[index];
-    const width = pinsLayer.clientWidth || window.innerWidth;
-    const height = pinsLayer.clientHeight || window.innerHeight;
-
-    createPin({
-      x: (position.x / 100) * width,
-      y: (position.y / 100) * height,
-      title: file.name,
-      subtitle: "Generate MD",
-      height: 2,
-      className: "file-pin",
-      onClick: () => generateMarkdownForFile(repo, file),
-    });
+  createPin({
+    x: (position.x / 100) * width,
+    y: (position.y / 100) * height,
+    title: file.name,
+    subtitle: "AI context",
+    height: 3,
+    className: "file-pin",
+    onClick: () => generateRepoContext(repo, file),
   });
 }
 
-function getPlaceholderFilesForRepo(repo) {
-  const language = String(repo.language || "").toLowerCase();
-
-  if (language.includes("python")) {
-    return [
-      { name: "README.md", role: "project overview" },
-      { name: "src/app.py", role: "main application entry" },
-      { name: "src/layout.py", role: "repo layout logic" },
-      { name: "tests/test_app.py", role: "test coverage" },
-      { name: "docs/architecture.md", role: "architecture notes" },
-    ];
+function generateRepoContext(repo, file) {
+  const repoId = repo.repoId || getRepoId(repo);
+  if (!repoId) {
+    showToast("Missing repo id for context generation.");
+    return;
   }
 
-  if (
-    language.includes("javascript") ||
-    language.includes("typescript") ||
-    language.includes("react")
-  ) {
-    return [
-      { name: "README.md", role: "project overview" },
-      { name: "src/main.js", role: "main app entry" },
-      { name: "src/components/Map.jsx", role: "map component" },
-      { name: "package.json", role: "project scripts" },
-      { name: "docs/architecture.md", role: "architecture notes" },
-    ];
+  logRepoAction(repo, "generate_context", 0);
+
+  if (activeContextSource) {
+    activeContextSource.close();
+    activeContextSource = null;
   }
 
-  if (
-    language.includes("c") ||
-    language.includes("c++") ||
-    language.includes("cpp")
-  ) {
-    return [
-      { name: "README.md", role: "project overview" },
-      { name: "src/main.c", role: "main source file" },
-      { name: "include/config.h", role: "configuration header" },
-      { name: "tests/test_main.c", role: "test coverage" },
-      { name: "docs/architecture.md", role: "architecture notes" },
-    ];
-  }
-
-  return [
-    { name: "README.md", role: "project overview" },
-    { name: "src/main", role: "main source file" },
-    { name: "config/layout.json", role: "layout configuration" },
-    { name: "tests/spec", role: "test coverage" },
-    { name: "docs/architecture.md", role: "architecture notes" },
-  ];
-}
-
-function generateMarkdownForFile(repo, file) {
-  logRepoAction(repo, "generate_md", 0);
-
-  currentMarkdownFilename = sanitizeFilename(`${repo.name}-${file.name}.md`);
-
-  currentMarkdown = `# ${file.name}
-
-## Repository
-
-**Name:** ${repo.name}  
-**Full name:** ${repo.fullName}  
-**Owner:** ${repo.owner}  
-**Language:** ${repo.language}
-
-## File Purpose
-
-This file represents the **${file.role}** for the selected repository entry point.
-
-## Map Metadata
-
-| Property | Value |
-|---|---|
-| Repo ID | ${repo.repoId} |
-| Tile X | ${repo.tileX} |
-| Tile Y | ${repo.tileY} |
-| Height | ${repo.height} |
-| Stars | ${repo.stars} |
-| Forks | ${repo.forks} |
-| Trending Score | ${toNumber(repo.trendingScore, 0).toFixed(2)} |
-| Personalization Score | ${toNumber(repo.personalizationScore, 0).toFixed(2)} |
-
-## Generated Notes
-
-This markdown file was generated from the city-view file pin for **${repo.name}**.
-`;
-
+  currentMarkdown = "";
+  currentMarkdownFilename = sanitizeFilename(`${repo.name || "repo"}-context.md`);
   markdownTitle.textContent = file.name;
-  markdownOutput.textContent = currentMarkdown;
+  markdownOutput.textContent = "Connecting to Repo Pilot context agent...\n";
   markdownPanel.classList.remove("hidden");
+  showToast(`Generating context for ${repo.name}...`);
 
-  showToast(`Generated markdown for ${file.name}`);
+  activeContextSource = api.streamRepoContext(repoId, {
+    onProgress: (message) => {
+      markdownOutput.textContent = `${message}\n\n(waiting for context.md...)`;
+    },
+    onChunk: (content) => {
+      currentMarkdown = content;
+      markdownOutput.textContent = content;
+    },
+    onComplete: (meta) => {
+      activeContextSource = null;
+      const cached = meta?.cached ? " (cached)" : "";
+      showToast(`context.md ready${cached}`);
+    },
+    onError: (error) => {
+      activeContextSource = null;
+      markdownOutput.textContent = `Error: ${error.message}\n\nCheck OPENAI_API_KEY on Railway and try again.`;
+      showToast(error.message);
+    },
+  });
 }
 
 function downloadCurrentMarkdown() {
