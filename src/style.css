@@ -136,6 +136,20 @@ body {
   background: #302400;
 }
 
+.pin-neighbor .pin-marker {
+  background: #9ad4ff;
+  width: 20px;
+  height: 20px;
+}
+
+.pin-neighbor .pin-marker::after {
+  background: #0d1f52;
+}
+
+.pin-primary .pin-pulse {
+  background: rgba(255, 224, 102, 0.45);
+}
+
 #dashboard {
   position: fixed;
   top: 20px;
@@ -313,6 +327,83 @@ button:active {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.stats-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.repo-language {
+  margin: 0 0 10px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.district-section h2 {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.district-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.district-row {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.district-row strong {
+  display: block;
+  font-size: 12px;
+}
+
+.district-row span {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+.district-row-active {
+  border-color: rgba(255, 224, 102, 0.55);
+  background: rgba(255, 224, 102, 0.12);
+}
+
+.agent-error-box {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(255, 90, 120, 0.22), rgba(120, 40, 80, 0.35));
+  border: 1px solid rgba(255, 140, 160, 0.45);
+}
+
+.agent-error-emoji {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.agent-error-title {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.agent-error-body {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.9;
 }
 
 .stats-grid div {

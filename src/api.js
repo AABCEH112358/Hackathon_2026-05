@@ -175,6 +175,14 @@ export const api = {
 
     const url = `${API_BASE_URL}/api/context/generate?${params.toString()}`;
     const source = new EventSource(url);
+    let finished = false;
+
+    const fail = (message) => {
+      if (finished) return;
+      finished = true;
+      source.close();
+      onError?.(new Error(message));
+    };
 
     source.addEventListener("progress", (event) => {
       try {
@@ -195,10 +203,12 @@ export const api = {
     });
 
     source.addEventListener("complete", (event) => {
+      if (finished) return;
+      finished = true;
       try {
         const data = JSON.parse(event.data);
         onComplete?.(data);
-      } catch (error) {
+      } catch {
         onComplete?.({});
       } finally {
         source.close();
@@ -215,16 +225,14 @@ export const api = {
       } catch {
         // use default message
       }
-      source.close();
-      onError?.(new Error(message));
+      fail(message);
     });
 
     source.onerror = () => {
-      if (source.readyState === EventSource.CLOSED) {
+      if (finished || source.readyState === EventSource.CLOSED) {
         return;
       }
-      source.close();
-      onError?.(new Error("Lost connection to context generator"));
+      fail("Lost connection to context generator");
     };
 
     return source;

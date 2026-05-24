@@ -58,7 +58,12 @@ async def event_stream(
             yield _format_sse("complete", {"cached": cached, "tokens_used": tokens_used})
     except Exception as e:
         logger.exception("context.generate_failed", repo_id=repo_id, error=str(e))
-        yield _format_sse("error", {"message": str(e)})
+        message = str(e)
+        if "api_key" in message.lower() or "credentials" in message.lower():
+            message = (
+                "Missing OpenAI credentials — set OPENAI_API_KEY on Railway and redeploy."
+            )
+        yield _format_sse("error", {"message": message})
 
 
 @router.get("/generate")

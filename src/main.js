@@ -32,14 +32,17 @@ const repoListSection = document.getElementById("repoListSection");
 const repoDetails = document.getElementById("repoDetails");
 const selectedRepoName = document.getElementById("selectedRepoName");
 const selectedRepoMeta = document.getElementById("selectedRepoMeta");
-const selectedRepoHeight = document.getElementById("selectedRepoHeight");
+const selectedRepoLanguage = document.getElementById("selectedRepoLanguage");
 const selectedRepoStars = document.getElementById("selectedRepoStars");
 const selectedRepoForks = document.getElementById("selectedRepoForks");
 const selectedRepoTrend = document.getElementById("selectedRepoTrend");
+const districtSection = document.getElementById("districtSection");
+const districtList = document.getElementById("districtList");
 
 const markdownPanel = document.getElementById("markdownPanel");
 const markdownTitle = document.getElementById("markdownTitle");
 const markdownOutput = document.getElementById("markdownOutput");
+const agentErrorBox = document.getElementById("agentErrorBox");
 const downloadMarkdownButton = document.getElementById("downloadMarkdownButton");
 
 const toast = document.getElementById("toast");
@@ -64,12 +67,16 @@ const CITY_MAPS = [
   "/assets/map3.png",
 ];
 
+const AERIAL_PIN_COUNT = 6;
+const CITY_DISTRICT_SIZE = 6;
+
 const cityFilePositions = [
   { x: 22, y: 38 },
   { x: 39, y: 25 },
   { x: 56, y: 45 },
   { x: 68, y: 31 },
   { x: 47, y: 64 },
+  { x: 30, y: 55 },
 ];
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -464,7 +471,7 @@ function pickAndRenderRandomRepos(sourceRepos) {
     return;
   }
 
-  visibleRepos = assignCityMaps(pickRandomItems(sourceRepos, 3));
+  visibleRepos = assignCityMaps(pickRandomItems(sourceRepos, AERIAL_PIN_COUNT));
   selectedRepo = null;
   currentView = "aerial";
   currentAerialTitle = "Random Entry Points";
@@ -482,7 +489,7 @@ function pickAndRenderRandomRepos(sourceRepos) {
   renderAerialPins(visibleRepos);
   renderRepoList();
 
-  setStatus(`Showing ${visibleRepos.length} randomly selected repo entry points.`);
+  setStatus(`Showing ${visibleRepos.length} repo districts on the map. Click any pin to fly in.`);
 }
 
 function pickRandomItems(items, count) {
@@ -513,8 +520,8 @@ function renderRepoList() {
       <p>${escapeHtml(repo.fullName)}</p>
       <div class="repo-tags">
         <span class="repo-tag">${escapeHtml(repo.language)}</span>
-        <span class="repo-tag">height ${formatNumber(repo.height)}</span>
         <span class="repo-tag">★ ${formatNumber(repo.stars)}</span>
+        <span class="repo-tag">trend ${toNumber(repo.trendingScore, 0).toFixed(2)}</span>
       </div>
     `;
 
@@ -621,9 +628,11 @@ function renderCityView(repo) {
   backButton.classList.remove("hidden");
 
   updateSelectedRepoDetails(repo);
-  renderCityFilePins(repo);
+  renderCityDistrict(repo);
 
-  setStatus("City view loaded. Click the context pin to generate context.md.");
+  setStatus(
+    `District loaded — ${buildCityDistrict(repo).length} repos. Gold pin = AI brief.`
+  );
 }
 
 function hideCityControls() {
@@ -659,9 +668,18 @@ async function loadRepoDetails(repo) {
 
     normalizedDetails.cityMap = repo.cityMap;
     normalizedDetails.cityMapNumber = repo.cityMapNumber;
+    normalizedDetails.similarRepos =
+      detailPayload.similar_repo_ids ||
+      detailPayload.similarRepoIds ||
+      rawDetails.similar_repo_ids ||
+      normalizedDetails.similarRepos ||
+      [];
 
     selectedRepo = normalizedDetails;
     updateSelectedRepoDetails(normalizedDetails);
+    if (currentView === "city") {
+      renderCityDistrict(normalizedDetails);
+    }
 
     console.log("Repo details loaded:", detailPayload);
   } catch (error) {
@@ -671,38 +689,189 @@ async function loadRepoDetails(repo) {
 
 function updateSelectedRepoDetails(repo) {
   selectedRepoName.textContent = repo.name;
+  selectedRepoMeta.textContent = repo.description || repo.fullName || "";
+  selectedRepoLanguage.textContent = repo.language
+    ? `${repo.language} · ${repo.fullName}`
+    : repo.fullName || "";
 
-  const metaParts = [
-    repo.fullName,
-    repo.language,
-    repo.description,
-  ].filter(Boolean);
+  selectedRepoStars.textContent = formatCompactNumber(repo.stars);
+  selectedRepoForks.textContent = formatCompactNumber(repo.forks);
+  selectedRepoTrend.textContent = formatTrendLabel(repo.trendingScore);
 
-  selectedRepoMeta.textContent = metaParts.join(" • ");
-
-  selectedRepoHeight.textContent = formatNumber(repo.height);
-  selectedRepoStars.textContent = formatNumber(repo.stars);
-  selectedRepoForks.textContent = formatNumber(repo.forks);
-  selectedRepoTrend.textContent = toNumber(repo.trendingScore, 0).toFixed(2);
+  renderDistrictList(repo);
 }
 
-function renderCityFilePins(repo) {
+function findRepoById(repoId) {
+  if (!repoId) return null;
+  return (
+    allRepos.find(
+      (item) =>
+        item.repoId === repoId ||
+        item.fullName === repoId ||
+        item.id === repoId
+    ) || null
+  );
+}
+
+function buildCityDistrict(primaryRepo) {
+  const district = [];
+  const seen = new Set();
+
+  const addRepo = (repo) => {
+    if (!repo) return;
+    const key = repo.repoId || repo.fullName;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    district.push(repo);
+  };
+
+  addRepo(primaryRepo);
+
+  for (const similarId of primaryRepo.similarRepos || []) {
+    addRepo(findRepoById(similarId));
+  }
+
+  for (const neighbor of visibleRepos) {
+    addRepo(neighbor);
+  }
+
+  if (district.length < CITY_DISTRICT_SIZE) {
+    const fillers = pickRandomItems(
+      allRepos.filter((item) => !seen.has(item.repoId)),
+      CITY_DISTRICT_SIZE - district.length
+    );
+    fillers.forEach(addRepo);
+  }
+
+  return district.slice(0, CITY_DISTRICT_SIZE);
+}
+
+function renderDistrictList(primaryRepo) {
+  if (!districtSection || !districtList) return;
+
+  const district = buildCityDistrict(primaryRepo);
+  districtSection.classList.remove("hidden");
+  districtList.innerHTML = "";
+
+  district.forEach((repo) => {
+    const isPrimary = (repo.repoId || repo.fullName) === (primaryRepo.repoId || primaryRepo.fullName);
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = `district-row${isPrimary ? " district-row-active" : ""}`;
+    row.innerHTML = `
+      <strong>${escapeHtml(repo.name)}</strong>
+      <span>${escapeHtml(repo.language || "—")} · ★ ${formatCompactNumber(repo.stars)}</span>
+    `;
+    row.addEventListener("click", () => {
+      if (isPrimary) {
+        generateRepoContext(repo, { name: "context.md" });
+      } else {
+        flyIntoRepo(repo);
+      }
+    });
+    districtList.appendChild(row);
+  });
+}
+
+function renderCityDistrict(primaryRepo) {
   clearPins();
 
-  const file = { name: "context.md", role: "why contribute + rebuild guide" };
-  const position = cityFilePositions[2];
+  const district = buildCityDistrict(primaryRepo);
   const width = pinsLayer.clientWidth || window.innerWidth;
   const height = pinsLayer.clientHeight || window.innerHeight;
 
-  createPin({
-    x: (position.x / 100) * width,
-    y: (position.y / 100) * height,
-    title: file.name,
-    subtitle: "AI context",
-    height: 3,
-    className: "file-pin",
-    onClick: () => generateRepoContext(repo, file),
+  district.forEach((repo, index) => {
+    const position = cityFilePositions[index % cityFilePositions.length];
+    const isPrimary =
+      (repo.repoId || repo.fullName) === (primaryRepo.repoId || primaryRepo.fullName);
+
+    createPin({
+      x: (position.x / 100) * width,
+      y: (position.y / 100) * height,
+      title: isPrimary ? "context.md" : repo.name,
+      subtitle: isPrimary ? "Summon AI agent" : `${repo.language || "repo"} · ★ ${formatCompactNumber(repo.stars)}`,
+      height: isPrimary ? 4 : Math.min(6, 2 + Math.floor((repo.stars || 0) / 50000)),
+      className: isPrimary ? "file-pin pin-primary" : "repo-pin pin-neighbor",
+      onClick: () => {
+        if (isPrimary) {
+          generateRepoContext(repo, { name: "context.md" });
+        } else {
+          flyIntoRepo(repo);
+        }
+      },
+    });
   });
+
+  renderDistrictList(primaryRepo);
+}
+
+function formatAgentError(rawMessage) {
+  const message = String(rawMessage || "").toLowerCase();
+
+  if (
+    message.includes("api_key") ||
+    message.includes("credentials") ||
+    message.includes("openai") ||
+    message.includes("authentication")
+  ) {
+    return {
+      emoji: "💀",
+      title: "Oops — the agent flatlined",
+      body: "Our context bot forgot its API keys. Anes needs to revive it on Railway (OPENAI_API_KEY), then try again.",
+    };
+  }
+
+  if (
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("429") ||
+    message.includes("insufficient")
+  ) {
+    return {
+      emoji: "🪫",
+      title: "Agent is out of juice",
+      body: "Looks like we hit the OpenAI quota wall. Wait a minute or beg for more credits, then respawn the agent.",
+    };
+  }
+
+  if (message.includes("timeout") || message.includes("timed out")) {
+    return {
+      emoji: "☕",
+      title: "Agent went on a coffee break",
+      body: "The request took too long and wandered off. Try again — or pick a smaller repo.",
+    };
+  }
+
+  if (message.includes("connection") || message.includes("network")) {
+    return {
+      emoji: "📡",
+      title: "Agent lost signal",
+      body: "Could not reach the server. Check your Wi‑Fi and that the Railway backend is awake.",
+    };
+  }
+
+  return {
+    emoji: "🤖",
+    title: "The agent glitched",
+    body: rawMessage || "Something unexpected happened. Try again in a sec.",
+  };
+}
+
+function showAgentError(rawMessage) {
+  const err = formatAgentError(rawMessage);
+  agentErrorBox.classList.remove("hidden");
+  agentErrorBox.innerHTML = `
+    <div class="agent-error-emoji">${err.emoji}</div>
+    <strong class="agent-error-title">${escapeHtml(err.title)}</strong>
+    <p class="agent-error-body">${escapeHtml(err.body)}</p>
+  `;
+  markdownOutput.classList.add("hidden");
+}
+
+function hideAgentError() {
+  agentErrorBox.classList.add("hidden");
+  agentErrorBox.innerHTML = "";
+  markdownOutput.classList.remove("hidden");
 }
 
 function generateRepoContext(repo, file) {
@@ -721,28 +890,32 @@ function generateRepoContext(repo, file) {
 
   currentMarkdown = "";
   currentMarkdownFilename = sanitizeFilename(`${repo.name || "repo"}-context.md`);
-  markdownTitle.textContent = file.name;
-  markdownOutput.textContent = "Connecting to Repo Pilot context agent...\n";
+  markdownTitle.textContent = file?.name || "context.md";
+  hideAgentError();
+  markdownOutput.textContent = "🛫 Summoning the context agent...\n";
   markdownPanel.classList.remove("hidden");
-  showToast(`Generating context for ${repo.name}...`);
+  showToast(`Waking the agent for ${repo.name}...`);
 
   activeContextSource = api.streamRepoContext(repoId, {
     onProgress: (message) => {
-      markdownOutput.textContent = `${message}\n\n(waiting for context.md...)`;
+      hideAgentError();
+      markdownOutput.textContent = `🛫 ${message}\n\n(hang tight — writing context.md...)`;
     },
     onChunk: (content) => {
+      hideAgentError();
       currentMarkdown = content;
       markdownOutput.textContent = content;
     },
     onComplete: (meta) => {
       activeContextSource = null;
-      const cached = meta?.cached ? " (cached)" : "";
-      showToast(`context.md ready${cached}`);
+      hideAgentError();
+      const cached = meta?.cached ? " (from cache)" : "";
+      showToast(`Agent delivered context.md${cached} ✨`);
     },
     onError: (error) => {
       activeContextSource = null;
-      markdownOutput.textContent = `Error: ${error.message}\n\nCheck OPENAI_API_KEY on Railway and try again.`;
-      showToast(error.message);
+      showAgentError(error.message);
+      showToast(formatAgentError(error.message).title);
     },
   });
 }
@@ -805,7 +978,7 @@ function pickRandomFromSearch(query) {
     return;
   }
 
-  visibleRepos = assignCityMaps(pickRandomItems(matches, 3));
+  visibleRepos = assignCityMaps(pickRandomItems(matches, AERIAL_PIN_COUNT));
   selectedRepo = null;
   currentView = "aerial";
   currentAerialTitle = "Search Entry Points";
@@ -823,7 +996,7 @@ function pickRandomFromSearch(query) {
   markdownPanel.classList.add("hidden");
   backButton.classList.add("hidden");
 
-  setStatus(`Found ${matches.length} matches for "${query}". Showing up to 3 random matches.`);
+  setStatus(`Found ${matches.length} matches for "${query}". Showing up to ${AERIAL_PIN_COUNT} random matches.`);
 }
 
 function returnToAerialView() {
@@ -837,6 +1010,7 @@ function returnToAerialView() {
   repoListSection.classList.remove("hidden");
   repoDetails.classList.add("hidden");
   markdownPanel.classList.add("hidden");
+  districtSection?.classList.add("hidden");
   backButton.classList.add("hidden");
 
   renderAerialMap();
@@ -921,6 +1095,20 @@ function saveCachedRepos(repos) {
   } catch (error) {
     console.warn("Could not save repo cache:", error);
   }
+}
+
+function formatCompactNumber(value) {
+  const n = Number(value) || 0;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatTrendLabel(score) {
+  const n = toNumber(score, 0);
+  if (n >= 0.37) return "🔥 Hot";
+  if (n >= 0.34) return "📈 Rising";
+  return "😴 Cool";
 }
 
 function formatNumber(value) {

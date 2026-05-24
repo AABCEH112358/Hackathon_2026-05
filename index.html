@@ -39,7 +39,7 @@
       </div>
 
       <div id="randomControls" class="button-row">
-        <button id="randomButton" type="button">Randomize 3</button>
+        <button id="randomButton" type="button">Randomize 6</button>
         <button id="resetButton" type="button">Reset</button>
       </div>
 
@@ -55,13 +55,9 @@
       <section id="repoDetails" class="repo-details hidden">
         <h2 id="selectedRepoName">Repo Name</h2>
         <p id="selectedRepoMeta"></p>
+        <p id="selectedRepoLanguage" class="repo-language"></p>
 
-        <div class="stats-grid">
-          <div>
-            <span>Height</span>
-            <strong id="selectedRepoHeight">-</strong>
-          </div>
-
+        <div class="stats-grid stats-grid-3">
           <div>
             <span>Stars</span>
             <strong id="selectedRepoStars">-</strong>
@@ -73,24 +69,30 @@
           </div>
 
           <div>
-            <span>Trend</span>
+            <span>Trending</span>
             <strong id="selectedRepoTrend">-</strong>
           </div>
         </div>
 
+        <section id="districtSection" class="district-section hidden">
+          <h2>In this district</h2>
+          <div id="districtList" class="district-list"></div>
+        </section>
+
         <p class="hint">
-          Click the context.md pin in the city view to generate an AI brief (what the repo is and why to contribute).
+          Gold pin = AI context.md. Blue pins = fly to a neighbor repo.
         </p>
       </section>
 
       <section id="markdownPanel" class="markdown-panel hidden">
         <div class="markdown-header">
-          <h2 id="markdownTitle">Generated file</h2>
+          <h2 id="markdownTitle">context.md</h2>
           <button id="downloadMarkdownButton" type="button">
-            Download .md
+            Download
           </button>
         </div>
 
+        <div id="agentErrorBox" class="agent-error-box hidden" role="alert"></div>
         <pre id="markdownOutput"></pre>
       </section>
     </aside>
