@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GitHub Atlas</title>
+  <title>RepoPilot</title>
 
-  <link rel="stylesheet" href="./src/style.css" />
+  <link rel="stylesheet" href="/src/style.css" />
 </head>
 
 <body>
@@ -14,27 +14,38 @@
     <div id="pinsLayer" class="pins-layer"></div>
 
     <aside id="dashboard">
+      <button
+        id="minimizeDashboardButton"
+        class="minimize-dashboard-button"
+        type="button"
+        aria-label="Minimize dashboard"
+      >
+        −
+      </button>
+
       <div class="dashboard-header">
-        <p class="eyebrow">Repository Atlas</p>
+        <p class="eyebrow">RepoPilot</p>
         <h1 id="dashboardTitle">Random Entry Points</h1>
         <p id="statusText">Loading repo layout from API...</p>
       </div>
 
-      <div class="search-row">
+      <div id="searchControls" class="search-row">
         <input
           id="searchInput"
           type="text"
           placeholder="Search repo, owner, language..."
         />
-        <button id="searchButton">Search</button>
+        <button id="searchButton" type="button">Search</button>
       </div>
 
-      <div class="button-row">
-        <button id="randomButton">Randomize 3</button>
-        <button id="resetButton">Reset</button>
+      <div id="randomControls" class="button-row">
+        <button id="randomButton" type="button">Randomize 3</button>
+        <button id="resetButton" type="button">Reset</button>
       </div>
 
-      <button id="backButton" class="hidden">← Back to aerial view</button>
+      <button id="backButton" class="hidden" type="button">
+        ← Back to aerial view
+      </button>
 
       <section id="repoListSection">
         <h2>Selected entry points</h2>
@@ -50,14 +61,17 @@
             <span>Height</span>
             <strong id="selectedRepoHeight">-</strong>
           </div>
+
           <div>
             <span>Stars</span>
             <strong id="selectedRepoStars">-</strong>
           </div>
+
           <div>
             <span>Forks</span>
             <strong id="selectedRepoForks">-</strong>
           </div>
+
           <div>
             <span>Trend</span>
             <strong id="selectedRepoTrend">-</strong>
@@ -72,8 +86,11 @@
       <section id="markdownPanel" class="markdown-panel hidden">
         <div class="markdown-header">
           <h2 id="markdownTitle">Generated file</h2>
-          <button id="downloadMarkdownButton">Download .md</button>
+          <button id="downloadMarkdownButton" type="button">
+            Download .md
+          </button>
         </div>
+
         <pre id="markdownOutput"></pre>
       </section>
     </aside>
@@ -81,7 +98,6 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="./src/api.js"></script>
-  <script src="./src/main.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

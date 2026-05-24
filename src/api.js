@@ -1,70 +1,165 @@
-const RepoApi = (() => {
-  const API_BASE_URL = "http://localhost:8000";
-  const LAYOUT_ENDPOINT = `${API_BASE_URL}/api/repos/layout`;
+const rawBaseUrl =
+  (import.meta.env.VITE_API_URL || "").trim() ||
+  "https://hackathon2026-05-production.up.railway.app";
 
-  async function fetchRepoLayout() {
-    const response = await fetch(LAYOUT_ENDPOINT);
+export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
+
+console.log("VITE API URL:", import.meta.env.VITE_API_URL);
+console.log("Using API base URL:", API_BASE_URL);
+
+async function apiFetch(path, options = {}, timeoutMs = 15000) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE_URL}${cleanPath}`;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(options.headers || {}),
+      },
+    });
 
     if (!response.ok) {
-      throw new Error(`API responded with ${response.status}`);
+      const errorText = await response.text().catch(() => "");
+      throw new Error(`API error ${response.status}: ${errorText}`);
     }
 
-    const payload = await response.json();
-    return normalizeRepoPayload(payload);
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    console.error(`API fetch failed for ${url}:`, error);
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function encodeRepoFullName(fullName) {
+  return String(fullName || "")
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+}
+
+export function normalizeRepoList(payload) {
+  if (Array.isArray(payload)) return payload;
+
+  return (
+    payload?.repos ||
+    payload?.items ||
+    payload?.data ||
+    payload?.results ||
+    []
+  );
+}
+
+export function getRepoFullName(repo) {
+  if (!repo) return null;
+
+  return (
+    repo.full_name ||
+    repo.fullName ||
+    repo.repo_full_name ||
+    repo.repoFullName ||
+    repo.name_with_owner ||
+    repo.nameWithOwner ||
+    (repo.owner && repo.name ? `${repo.owner}/${repo.name}` : null)
+  );
+}
+
+export function getRepoId(repo) {
+  if (!repo) return null;
+
+  return (
+    repo.repo_id ||
+    repo.repoId ||
+    repo.id ||
+    getRepoFullName(repo)
+  );
+}
+
+export function normalizeScoreMap(payload) {
+  const rows = Array.isArray(payload)
+    ? payload
+    : payload?.scores ||
+      payload?.repos ||
+      payload?.items ||
+      payload?.data ||
+      payload?.results ||
+      [];
+
+  const map = {};
+
+  for (const row of rows) {
+    const key =
+      row.repo_id ||
+      row.repoId ||
+      row.id ||
+      row.full_name ||
+      row.fullName ||
+      row.repo_full_name ||
+      row.repoFullName;
+
+    const value =
+      row.trending_score ??
+      row.trendingScore ??
+      row.score ??
+      row.personalization_score ??
+      row.personalizationScore;
+
+    if (key !== undefined && key !== null && value !== undefined && value !== null) {
+      map[key] = Number(value);
+    }
   }
 
-  function normalizeRepoPayload(payload) {
-    const rawRepos = Array.isArray(payload)
-      ? payload
-      : payload.repos || payload.items || payload.data || [];
+  return map;
+}
 
-    return rawRepos
-      .map((repo, index) => {
-        const tileX = Number(repo.tile_x ?? repo.tileX ?? repo.x ?? 0);
-        const tileY = Number(repo.tile_y ?? repo.tileY ?? repo.y ?? 0);
+export const api = {
+  getLayout() {
+    return apiFetch("/api/repos/layout", {}, 15000);
+  },
 
-        return {
-          id: repo.id ?? repo.repo_id ?? index,
-          name: repo.name || getNameFromFullName(repo.full_name) || `Repo ${index + 1}`,
-          fullName: repo.full_name || repo.fullName || repo.name || `Repo ${index + 1}`,
-          owner:
-            repo.owner ||
-            repo.owner_login ||
-            getOwnerFromFullName(repo.full_name) ||
-            "Unknown owner",
-          language: repo.language || "Unknown",
-          tileX: clamp(tileX, 0, 63),
-          tileY: clamp(tileY, 0, 63),
-          height: clamp(Number(repo.height ?? 1), 1, 6),
-          stars: Number(repo.stars ?? repo.stargazers_count ?? 0),
-          forks: Number(repo.forks ?? repo.forks_count ?? 0),
-          trendingScore: Number(repo.trending_score ?? repo.trendingScore ?? 0),
-          description: repo.description || "No description provided.",
-          url: repo.html_url || repo.url || "",
-          raw: repo,
-        };
-      })
-      .filter((repo) => Number.isFinite(repo.tileX) && Number.isFinite(repo.tileY));
-  }
+  getTrendingScores() {
+    return apiFetch("/api/trending/scores", {}, 15000);
+  },
 
-  function getNameFromFullName(fullName) {
-    if (!fullName || typeof fullName !== "string") return "";
-    return fullName.split("/").pop();
-  }
+  getPersonalizedScores(userId) {
+    return apiFetch(
+      "/api/personalize/score",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: userId,
+        }),
+      },
+      15000
+    );
+  },
 
-  function getOwnerFromFullName(fullName) {
-    if (!fullName || typeof fullName !== "string") return "";
-    return fullName.split("/")[0];
-  }
+  logInteraction({ userId, repoId, action, durationMs = 0 }) {
+    return apiFetch(
+      "/api/interactions",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: userId,
+          repo_id: repoId,
+          action,
+          duration_ms: durationMs,
+        }),
+      },
+      8000
+    );
+  },
 
-  function clamp(value, min, max) {
-    if (!Number.isFinite(value)) return min;
-    return Math.min(Math.max(value, min), max);
-  }
-
-  return {
-    fetchRepoLayout,
-    API_BASE_URL,
-    LAYOUT_ENDPOINT,
-  };
-})();
+  getRepoDetails(fullName) {
+    const encoded = encodeRepoFullName(fullName);
+    return apiFetch(`/api/repos/${encoded}`, {}, 15000);
+  },
+};
