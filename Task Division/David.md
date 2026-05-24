@@ -1,5 +1,5 @@
 # David — Context.md AI Agent
-## GitHub Atlas Hackathon
+## Repo Pilot Hackathon
 
 You own the AI agent that's the "kicker" of the demo. Given any repo on our map, your agent generates a `context.md` that's both human-readable AND structured to be fed back into an AI coding agent (Cursor, Claude Code) to recreate a working clone of that tool.
 
@@ -32,7 +32,7 @@ You're confident with Python/API, intermediate elsewhere. This prompt is calibra
 ## THE CURSOR PROMPT (copy everything below into Cursor's agent)
 
 ```
-You are building the AI agent for "GitHub Atlas" that generates context.md
+You are building the AI agent for "Repo Pilot" that generates context.md
 files for GitHub repos. The context.md serves two purposes:
   1. Human-readable brief of the repo
   2. A "rebuild prompt" — structured instructions an AI coding agent can

@@ -1,4 +1,4 @@
-"""GitHub Atlas FastAPI application."""
+"""Repo Pilot FastAPI application."""
 
 import structlog
 from contextlib import asynccontextmanager
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="GitHub Atlas API",
+        title="Repo Pilot API",
         description="Isometric GitHub repo map — ingestion, layout, ML scoring",
         version="0.1.0",
         lifespan=lifespan,

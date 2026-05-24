@@ -1,5 +1,5 @@
 # Anes — Neural Networks + Backend/Data
-## GitHub Atlas Hackathon
+## Repo Pilot Hackathon
 
 You own the data layer and both neural networks. You're full-stack, so the backend/data part folds into your role naturally — the NNs need data to train on, so the ingestion pipeline is yours.
 
@@ -33,7 +33,7 @@ You own the data layer and both neural networks. You're full-stack, so the backe
 ## THE CURSOR PROMPT (copy everything below into Cursor's agent)
 
 ```
-You are scaffolding the backend + ML stack for "GitHub Atlas", a SimCity-style
+You are scaffolding the backend + ML stack for "Repo Pilot", a SimCity-style
 isometric map of GitHub repos. My role: data ingestion, layout algorithm, two
 neural networks, and FastAPI endpoints to serve everything.
 

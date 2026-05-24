@@ -1,5 +1,5 @@
 # Abiya — Map + Phaser (the visual centerpiece)
-## GitHub Atlas Hackathon
+## Repo Pilot Hackathon
 
 You own the visual centerpiece. **This IS the demo.** Buildings, glow, camera, the whole isometric SimCity feel — it's all yours. Make it beautiful and make it run smooth.
 
@@ -31,7 +31,7 @@ You're confident with frontend but new to Phaser. That's fine — Phaser 3 has g
 ## THE CURSOR PROMPT (copy everything below into Cursor's agent)
 
 ```
-I'm building the visual centerpiece of "GitHub Atlas" — an isometric
+I'm building the visual centerpiece of "Repo Pilot" — an isometric
 SimCity-style map where every GitHub repo is a building. Integrate
 Phaser 3 into our existing Next.js 14 App Router app (located at /web).
 

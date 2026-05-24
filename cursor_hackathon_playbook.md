@@ -335,7 +335,7 @@ Things we'll nail down in chat deep-dives, in rough priority order:
 
 ---
 
-## 9. THE PROJECT: GitHub Atlas
+## 9. THE PROJECT: Repo Pilot
 
 **The pitch in one line:** A SimCity-style isometric map of GitHub where buildings are repos, districts are programming domains, two neural networks make the city predictive and personal, and an AI agent generates "rebuild prompts" from any repo.
 
