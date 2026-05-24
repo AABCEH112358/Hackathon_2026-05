@@ -149,11 +149,145 @@ function expandSearchTerms(query) {
   return [...terms];
 }
 
-export function buildDistricts(allRepos) {
+function shuffleInPlace(items) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function decorateRepoForDistrict(repo, bucket) {
+  return {
+    ...repo,
+    cityMap: bucket.map,
+    districtId: bucket.id,
+    districtName: bucket.name,
+  };
+}
+
+function finalizeBuckets(buckets) {
+  return buckets.map((bucket) => ({
+    ...bucket,
+    repos: bucket.repos
+      .slice(0, REPOS_PER_DISTRICT)
+      .map((repo) => decorateRepoForDistrict(repo, bucket)),
+  }));
+}
+
+/** Best-matching district theme for a repo (even if not currently slotted). */
+export function bestDistrictDefForRepo(repo) {
+  let best = DISTRICT_DEFS[0];
+  let bestScore = -1;
+
+  for (const def of DISTRICT_DEFS) {
+    const score = scoreRepoForDistrict(repo, def);
+    if (score > bestScore) {
+      bestScore = score;
+      best = def;
+    }
+  }
+
+  return best;
+}
+
+export function predictDistrictForRepo(districts, repo) {
+  const slotted = findDistrictForRepo(districts, repo);
+  if (slotted) return slotted;
+
+  const def = bestDistrictDefForRepo(repo);
+  return (
+    districts.find((d) => d.id === def.id) || {
+      ...def,
+      repos: [],
+    }
+  );
+}
+
+/**
+ * Place repo into a district. If full, replaces the lowest-star repo.
+ * Returns { districts, district, replaced }.
+ */
+export function slotRepoIntoDistricts(districts, repo, districtDef) {
+  const updated = districts.map((d) => ({
+    ...d,
+    repos: [...d.repos],
+  }));
+
+  const target = updated.find((d) => d.id === districtDef.id);
+  if (!target) {
+    return { districts: updated, district: null, replaced: null };
+  }
+
+  const key = repo.repoId || repo.fullName;
+  const existingIdx = target.repos.findIndex(
+    (r) => (r.repoId || r.fullName) === key
+  );
+
+  const normalized = decorateRepoForDistrict(repo, target);
+  let replaced = null;
+
+  if (existingIdx >= 0) {
+    target.repos[existingIdx] = normalized;
+    return { districts: updated, district: target, replaced: null };
+  }
+
+  if (target.repos.length < REPOS_PER_DISTRICT) {
+    target.repos.push(normalized);
+    return { districts: updated, district: target, replaced: null };
+  }
+
+  let lowestIdx = 0;
+  for (let i = 1; i < target.repos.length; i++) {
+    if ((target.repos[i].stars || 0) < (target.repos[lowestIdx].stars || 0)) {
+      lowestIdx = i;
+    }
+  }
+
+  replaced = target.repos[lowestIdx];
+  target.repos[lowestIdx] = normalized;
+
+  return { districts: updated, district: target, replaced };
+}
+
+export function buildDistricts(allRepos, options = {}) {
+  const randomize = options.randomize === true;
   const buckets = DISTRICT_DEFS.map((def) => ({
     ...def,
     repos: [],
   }));
+
+  const assigned = new Set();
+
+  if (randomize) {
+    for (const def of DISTRICT_DEFS) {
+      const bucket = buckets.find((b) => b.id === def.id);
+      if (!bucket) continue;
+
+      const themed = shuffleInPlace(
+        allRepos
+          .filter((repo) => !assigned.has(repo.repoId))
+          .map((repo) => ({ repo, score: scoreRepoForDistrict(repo, def) }))
+          .filter((entry) => entry.score > 0)
+      );
+
+      const picks = themed.slice(0, REPOS_PER_DISTRICT);
+
+      while (picks.length < REPOS_PER_DISTRICT) {
+        const pool = allRepos.filter((repo) => !assigned.has(repo.repoId));
+        if (!pool.length) break;
+        const randomRepo = pool[Math.floor(Math.random() * pool.length)];
+        picks.push({ repo: randomRepo, score: 0 });
+      }
+
+      for (const { repo } of picks) {
+        bucket.repos.push(repo);
+        assigned.add(repo.repoId);
+      }
+    }
+
+    return finalizeBuckets(buckets);
+  }
 
   const ranked = allRepos
     .map((repo) => {
@@ -162,8 +296,6 @@ export function buildDistricts(allRepos) {
       return { repo, bestIdx, bestScore: scores[bestIdx] };
     })
     .sort((a, b) => b.repo.stars - a.repo.stars);
-
-  const assigned = new Set();
 
   for (const { repo, bestIdx } of ranked) {
     if (buckets[bestIdx].repos.length >= REPOS_PER_DISTRICT) continue;
@@ -180,15 +312,7 @@ export function buildDistricts(allRepos) {
     }
   }
 
-  return buckets.map((bucket) => ({
-    ...bucket,
-    repos: bucket.repos.slice(0, REPOS_PER_DISTRICT).map((repo) => ({
-      ...repo,
-      cityMap: bucket.map,
-      districtId: bucket.id,
-      districtName: bucket.name,
-    })),
-  }));
+  return finalizeBuckets(buckets);
 }
 
 export function searchReposByField(allRepos, query) {

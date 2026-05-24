@@ -8,7 +8,9 @@ import {
 import {
   buildDistricts,
   searchReposByField,
-  findDistrictForRepo,
+  bestDistrictDefForRepo,
+  predictDistrictForRepo,
+  slotRepoIntoDistricts,
   REPOS_PER_DISTRICT,
 } from "./districts.js";
 
@@ -33,7 +35,6 @@ const eyebrow = document.querySelector(".eyebrow");
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const randomButton = document.getElementById("randomButton");
-const resetButton = document.getElementById("resetButton");
 const backButton = document.getElementById("backButton");
 
 const searchControls =
@@ -219,11 +220,6 @@ function attachEventListeners() {
   });
 
   randomButton.addEventListener("click", reshuffleDistricts);
-
-  resetButton.addEventListener("click", () => {
-    searchInput.value = "";
-    returnToAerialView();
-  });
 
   backButton.addEventListener("click", returnToAerialView);
   downloadMarkdownButton.addEventListener("click", downloadCurrentMarkdown);
@@ -493,10 +489,9 @@ function normalizeBackendRepo(rawRepo, index = 0) {
 
 function reshuffleDistricts() {
   if (!allRepos.length) return;
-  const shuffled = pickRandomItems(allRepos, allRepos.length);
-  districts = buildDistricts(shuffled);
+  districts = buildDistricts(allRepos, { randomize: true });
   returnToAerialView();
-  showToast("Districts reshuffled — same themes, new repos.");
+  showToast("Districts reshuffled — new random repos per theme.");
 }
 
 function renderAerialWorld() {
@@ -603,12 +598,14 @@ function renderSearchResults(matches, query) {
   renderAerialMap();
   clearPins();
 
-  setStatus(`Found ${matches.length} repos for "${query}". Click one to enter its district.`);
+  setStatus(
+    `Found ${matches.length} matches. Click a repo to fly in — we'll slot it into the best district.`
+  );
 
   repoList.innerHTML = "";
 
   matches.slice(0, 25).forEach((repo) => {
-    const district = findDistrictForRepo(districts, repo);
+    const district = predictDistrictForRepo(districts, repo);
     const card = document.createElement("article");
     card.className = "repo-card";
 
@@ -616,7 +613,7 @@ function renderSearchResults(matches, query) {
       <strong>${escapeHtml(repo.name)}</strong>
       <p>${escapeHtml(repo.fullName)}</p>
       <div class="repo-tags">
-        <span class="repo-tag">${district ? district.emoji + " " + district.name : "—"}</span>
+        <span class="repo-tag">${district.emoji} ${district.name}</span>
         <span class="repo-tag">★ ${formatCompactNumber(repo.stars)}</span>
       </div>
     `;
@@ -624,6 +621,18 @@ function renderSearchResults(matches, query) {
     card.addEventListener("click", () => openRepoFromSearch(repo));
     repoList.appendChild(card);
   });
+}
+
+function resolveFullRepo(repo) {
+  const key = repo.repoId || getRepoId(repo) || repo.fullName;
+  return (
+    allRepos.find(
+      (item) =>
+        item.repoId === key ||
+        item.fullName === key ||
+        item.id === key
+    ) || repo
+  );
 }
 
 function renderAerialMap() {
@@ -657,12 +666,35 @@ function renderAerialDistrictPins() {
 }
 
 function openRepoFromSearch(repo) {
-  const district = findDistrictForRepo(districts, repo);
-  if (!district) {
-    showToast("Could not find a district for this repo.");
+  if (!allRepos.length) {
+    showToast("Repos still loading — try again in a moment.");
     return;
   }
-  pendingSearchRepo = repo;
+
+  const fullRepo = resolveFullRepo(repo);
+  const districtDef = bestDistrictDefForRepo(fullRepo);
+  const { districts: nextDistricts, district, replaced } = slotRepoIntoDistricts(
+    districts,
+    fullRepo,
+    districtDef
+  );
+
+  if (!district) {
+    showToast("Could not place this repo in a district.");
+    return;
+  }
+
+  districts = nextDistricts;
+  pendingSearchRepo = fullRepo;
+
+  if (replaced) {
+    showToast(
+      `Swapped into ${district.emoji} ${district.name} (replaced ${replaced.name}).`
+    );
+  } else {
+    showToast(`Opened in ${district.emoji} ${district.name}.`);
+  }
+
   flyIntoDistrict(district);
 }
 
