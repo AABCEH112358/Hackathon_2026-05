@@ -1,4 +1,4 @@
-"""GitHub Atlas FastAPI application."""
+"""Repo Pilot FastAPI application."""
 
 import structlog
 from contextlib import asynccontextmanager
@@ -9,7 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
 from db.session import init_db, test_connection
+from routes import context as context_route
 from routes import repos
+from routes.interactions import router as interactions_router
+from routes.personalize import router as personalize_router
+from routes.trending import router as trending_router
 
 import logging
 
@@ -42,7 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
-        title="GitHub Atlas API",
+        title="Repo Pilot API",
         description="Isometric GitHub repo map — ingestion, layout, ML scoring",
         version="0.1.0",
         lifespan=lifespan,
@@ -59,6 +63,10 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(repos.router, prefix="/api/repos", tags=["repos"])
+    app.include_router(context_route.router, prefix="/api/context", tags=["context"])
+    app.include_router(trending_router, prefix="/api/trending")
+    app.include_router(interactions_router, prefix="/api/interactions")
+    app.include_router(personalize_router, prefix="/api/personalize")
     return app
 
 
