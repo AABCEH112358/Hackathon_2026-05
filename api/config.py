@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://user:pass@localhost/github_atlas"
     github_token: str | None = None
+    openai_api_key: str | None = None
     github_seed_limit: int = 100
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dim: int = 384

@@ -45,3 +45,13 @@ CREATE TABLE IF NOT EXISTS star_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_star_history_repo_date ON star_history (repo_id, date DESC);
+
+CREATE TABLE IF NOT EXISTS context_cache (
+    id VARCHAR(512) PRIMARY KEY,
+    repo_id VARCHAR(512) NOT NULL REFERENCES repos (id) ON DELETE CASCADE,
+    content_md TEXT NOT NULL,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    model_version VARCHAR(128) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_context_cache_repo_generated ON context_cache (repo_id, generated_at DESC);

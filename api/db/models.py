@@ -43,6 +43,7 @@ class Repo(Base):
 
     interactions: Mapped[list["UserInteraction"]] = relationship(back_populates="repo")
     star_history: Mapped[list["StarHistory"]] = relationship(back_populates="repo")
+    context_caches: Mapped[list["ContextCache"]] = relationship(back_populates="repo")
 
 
 class UserInteraction(Base):
@@ -72,3 +73,19 @@ class StarHistory(Base):
     stars: Mapped[int] = mapped_column(Integer, nullable=False)
 
     repo: Mapped["Repo"] = relationship(back_populates="star_history")
+
+
+class ContextCache(Base):
+    __tablename__ = "context_cache"
+
+    id: Mapped[str] = mapped_column(String(512), primary_key=True)
+    repo_id: Mapped[str] = mapped_column(
+        String(512), ForeignKey("repos.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    content_md: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    model_version: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    repo: Mapped["Repo"] = relationship(back_populates="context_caches")
